@@ -23,10 +23,11 @@ If prefered you can run the app directly with the pre-compiled execuatable
 2. **Generate a Gitlab PAT** with the following scopes:
    - read_api
    - read_user
-3. **Double-click** the `.exe` file to run it.
-4. **Follow the prompts** on the screen. It will ask for your GitLab URL and
+3. See [CLI Flags](#cli-flags) section for the full list of options 
+4. **Double-click** the `.exe` file to run it.
+5. **Follow the prompts** on the screen. It will ask for your GitLab URL and
    Token if you haven't set them up beforehand.
-5. Once it finishes, look for a new file named `gitlab_issues.json` right next
+6. Once it finishes, look for a new file named `gitlab_issues.json` right next
    to the app.
 
 ## Prerequisites
