@@ -6,8 +6,8 @@ interface GitHubSearchResponse {
   items?: GitHubIssue[];
 }
 
-const escapeGitHubValue = (str: string): string => {
-  return str.replace(/"/g, '\\"');
+const escapeGitHubValue = (value: string): string => {
+  return value.replace(/"/g, '\\"');
 };
 
 const isoDateOnly = (value: string): string => value.split("T")[0];
@@ -21,11 +21,10 @@ const getPaginatedSearchResults = async (
   query: string,
 ): Promise<GitHubIssue[]> => {
   const allIssues: GitHubIssue[] = [];
-  let page = 1;
   const perPage = 100;
   const baseURL = baseApiUrl(githubURL);
 
-  while (true) {
+  for (let page = 1;; page++) {
     const searchUrl = new URL("search/issues", baseURL);
     searchUrl.searchParams.set("q", query);
     searchUrl.searchParams.set("page", String(page));
@@ -48,7 +47,6 @@ const getPaginatedSearchResults = async (
     if (allIssues.length >= totalCount) {
       break;
     }
-    page++;
   }
 
   return allIssues;
@@ -59,10 +57,9 @@ const getIssueComments = async (
   commentsURL: string,
 ): Promise<any[]> => {
   const allComments: any[] = [];
-  let page = 1;
   const perPage = 100;
 
-  while (true) {
+  for (let page = 1;; page++) {
     const url = new URL(commentsURL);
     url.searchParams.set("page", String(page));
     url.searchParams.set("per_page", String(perPage));
@@ -78,7 +75,6 @@ const getIssueComments = async (
     }
 
     allComments.push(...comments);
-    page++;
   }
 
   return allComments;
@@ -89,7 +85,9 @@ const removeNulls = (obj: any): any => {
     return obj
       .map((v) => removeNulls(v))
       .filter((v) => v !== null && v !== undefined);
-  } else if (typeof obj === "object" && obj !== null) {
+  }
+
+  if (typeof obj === "object" && obj !== null) {
     const newObj: any = {};
     for (const key in obj) {
       const val = removeNulls(obj[key]);
@@ -99,7 +97,71 @@ const removeNulls = (obj: any): any => {
     }
     return newObj;
   }
+
   return obj;
+};
+
+const buildQueries = (
+  username: string,
+  startDate: string,
+  endDate: string,
+  fetchMode: string,
+): string[] => {
+  const safeUser = escapeGitHubValue(username);
+  const from = isoDateOnly(startDate);
+  const to = isoDateOnly(endDate);
+
+  if (fetchMode === "my_issues") {
+    return [
+      `type:issue author:${safeUser} created:${from}..${to}`,
+      `type:issue assignee:${safeUser} created:${from}..${to}`,
+    ];
+  }
+
+  if (fetchMode === "all_contributions") {
+    return [`type:issue involves:${safeUser} updated:${from}..${to}`];
+  }
+
+  throw new Error(`Invalid fetch mode: ${fetchMode}`);
+};
+
+const dedupeIssues = (issues: GitHubIssue[]): GitHubIssue[] => {
+  const byId = new Map<number, GitHubIssue>();
+  for (const issue of issues) {
+    byId.set(issue.id, issue);
+  }
+  return [...byId.values()];
+};
+
+const enrichIssue = async (
+  issue: GitHubIssue,
+  headers: Record<string, string>,
+): Promise<GitHubIssue> => {
+  const commentCount = issue.comments ?? 0;
+  const commentsURL = typeof issue.comments_url === "string"
+    ? issue.comments_url
+    : undefined;
+
+  const notes = commentCount > 0 && commentsURL
+    ? await getIssueComments(headers, commentsURL)
+    : [];
+
+  issue.notes = notes;
+  issue.metadata = {
+    repository: typeof issue.repository_url === "string"
+      ? issue.repository_url.split("/").slice(-2).join("/")
+      : undefined,
+    labelNames: (issue.labels ?? [])
+      .map((label) => label?.name)
+      .filter((name): name is string => Boolean(name)),
+    assigneeLogins: (issue.assignees ?? [])
+      .map((assignee) => assignee?.login)
+      .filter((login): login is string => Boolean(login)),
+    milestoneTitle: issue.milestone?.title ?? null,
+    commentCount,
+  };
+
+  return issue;
 };
 
 export const githubIssues = async (
@@ -110,70 +172,22 @@ export const githubIssues = async (
   endDate: string,
   fetchMode: string,
 ) => {
-  const safeUser = escapeGitHubValue(username);
-  const rangeStart = isoDateOnly(startDate);
-  const rangeEnd = isoDateOnly(endDate);
+  const queries = buildQueries(username, startDate, endDate, fetchMode);
 
-  let issues: GitHubIssue[] = [];
+  const results = await Promise.all(
+    queries.map((query) =>
+      getPaginatedSearchResults(githubURL, headers, query)
+    ),
+  );
 
-  if (fetchMode === "my_issues") {
-    const authorQuery =
-      `type:issue author:${safeUser} created:${rangeStart}..${rangeEnd}`;
-    const assigneeQuery =
-      `type:issue assignee:${safeUser} created:${rangeStart}..${rangeEnd}`;
-    const [authorIssues, assigneeIssues] = await Promise.all([
-      getPaginatedSearchResults(githubURL, headers, authorQuery),
-      getPaginatedSearchResults(githubURL, headers, assigneeQuery),
-    ]);
-    issues = [...authorIssues, ...assigneeIssues];
-  } else if (fetchMode === "all_contributions") {
-    const contributionsQuery =
-      `type:issue involves:${safeUser} updated:${rangeStart}..${rangeEnd}`;
-    issues = await getPaginatedSearchResults(
-      githubURL,
-      headers,
-      contributionsQuery,
-    );
-  } else {
-    throw new Error(`Invalid fetch mode: ${fetchMode}`);
-  }
-
+  const issues = dedupeIssues(results.flat());
   if (!issues.length) {
     return [];
   }
 
-  const deduped = new Map<number, GitHubIssue>();
-  for (const issue of issues) {
-    deduped.set(issue.id, issue);
-  }
+  const enriched = await Promise.all(
+    issues.map((issue) => enrichIssue(issue, headers)),
+  );
 
-  const finalIssues: GitHubIssue[] = [];
-  for (const issue of deduped.values()) {
-    const commentsCount = issue.comments ?? 0;
-    const commentsURL = typeof issue.comments_url === "string"
-      ? issue.comments_url
-      : undefined;
-    const notes = commentsCount > 0 && commentsURL
-      ? await getIssueComments(headers, commentsURL)
-      : [];
-
-    issue.notes = notes;
-    issue.metadata = {
-      repository: typeof issue.repository_url === "string"
-        ? issue.repository_url.split("/").slice(-2).join("/")
-        : undefined,
-      labelNames: (issue.labels ?? [])
-        .map((l) => l?.name)
-        .filter((name): name is string => Boolean(name)),
-      assigneeLogins: (issue.assignees ?? [])
-        .map((a) => a?.login)
-        .filter((login): login is string => Boolean(login)),
-      milestoneTitle: issue.milestone?.title ?? null,
-      commentCount: commentsCount,
-    };
-
-    finalIssues.push(issue);
-  }
-
-  return removeNulls(finalIssues);
+  return removeNulls(enriched);
 };

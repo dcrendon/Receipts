@@ -4,36 +4,31 @@ import { requestJsonWithRetry } from "./http_client.ts";
 const getPaginatedResults = async (
   gitlabURL: string,
   headers: Record<string, string>,
-  params: { [key: string]: string | number } = {},
-) => {
-  let page = 1;
+  params: Record<string, string | number> = {},
+): Promise<any[]> => {
+  const allResults: any[] = [];
   const perPage = 100;
-  const allIssues = [];
 
-  while (true) {
-    params["page"] = page;
-    params["per_page"] = perPage;
+  for (let page = 1;; page++) {
     const url = new URL(gitlabURL);
-
-    const searchParams = new URLSearchParams();
-    Object.keys(params).forEach((key) => {
-      searchParams.append(key, String(params[key]));
-    });
-    url.search = searchParams.toString();
+    const query = new URLSearchParams(
+      Object.entries({ ...params, page, per_page: perPage }).map((
+        [key, value],
+      ) => [key, String(value)]),
+    );
+    url.search = query.toString();
 
     const data = await requestJsonWithRetry<any[]>(
       url.toString(),
       { headers },
       "GitLab",
     );
-    if (data.length === 0) {
-      break;
-    }
-    allIssues.push(...data);
-    page++;
+
+    if (!data.length) break;
+    allResults.push(...data);
   }
 
-  return allIssues;
+  return allResults;
 };
 
 const getUserID = async (
@@ -49,7 +44,6 @@ const getUserID = async (
   );
 
   console.log(`User ID fetched: ${data.id}`);
-
   return data.id;
 };
 
@@ -65,8 +59,59 @@ const getProjects = async (
   const projects = await getPaginatedResults(projectsURL, headers);
 
   console.log(`Fetched projects: ${projects.length}`);
-
   return projects;
+};
+
+const addUniqueIssues = (
+  issueMap: Map<number, GitlabIssue>,
+  issues: GitlabIssue[],
+) => {
+  for (const issue of issues) {
+    issueMap.set(issue.id, issue);
+  }
+};
+
+const fetchProjectIssues = async (
+  projectID: number,
+  gitlabURL: string,
+  headers: Record<string, string>,
+  userID: number,
+  startDate: string,
+  endDate: string,
+  fetchMode: string,
+): Promise<GitlabIssue[]> => {
+  const projectURL = `${gitlabURL}/api/v4/projects/${projectID}/issues`;
+
+  if (fetchMode === "my_issues") {
+    const baseParams = {
+      scope: "all",
+      created_after: startDate,
+      created_before: endDate,
+    };
+
+    const [assignedIssues, createdIssues] = await Promise.all([
+      getPaginatedResults(projectURL, headers, {
+        ...baseParams,
+        assignee_id: userID,
+      }),
+      getPaginatedResults(projectURL, headers, {
+        ...baseParams,
+        author_id: userID,
+      }),
+    ]);
+
+    return [...assignedIssues, ...createdIssues];
+  }
+
+  if (fetchMode === "all_contributions") {
+    return await getPaginatedResults(projectURL, headers, {
+      scope: "all",
+      updated_after: startDate,
+      updated_before: endDate,
+    });
+  }
+
+  throw new Error(`Invalid fetch mode: ${fetchMode}`);
 };
 
 const getIssues = async (
@@ -80,60 +125,33 @@ const getIssues = async (
 ) => {
   console.log("\nFetching issues...");
 
-  const params = {
-    scope: "all",
-  };
   const issuesToProcess = new Map<number, GitlabIssue>();
 
   for (const project of projects) {
-    const projectID = project.id;
-    const projectURL = `${gitlabURL}/api/v4/projects/${projectID}/issues`;
-
-    if (fetchMode === "my_issues") {
-      const baseParams = {
-        ...params,
-        created_after: startDate,
-        created_before: endDate,
-      };
-      const assignedParams = { ...baseParams, assignee_id: userID };
-      const createdParams = { ...baseParams, author_id: userID };
-      const assignedIssues: GitlabIssue[] = await getPaginatedResults(
-        projectURL,
-        headers,
-        assignedParams,
-      );
-      const createdIssues: GitlabIssue[] = await getPaginatedResults(
-        projectURL,
-        headers,
-        createdParams,
-      );
-      const combinedIssues = [...assignedIssues, ...createdIssues];
-
-      for (const issue of combinedIssues) {
-        issuesToProcess.set(issue.id, issue);
-      }
-    } else if (fetchMode === "all_contributions") {
-      const baseParams = {
-        ...params,
-        updated_after: startDate,
-        updated_before: endDate,
-      };
-      const issues = await getPaginatedResults(
-        projectURL,
-        headers,
-        baseParams,
-      );
-      for (const issue of issues) {
-        issuesToProcess.set(issue.id, issue);
-      }
-    } else {
-      throw new Error(`Invalid fetch mode: ${fetchMode}`);
-    }
+    const projectIssues = await fetchProjectIssues(
+      project.id,
+      gitlabURL,
+      headers,
+      userID,
+      startDate,
+      endDate,
+      fetchMode,
+    );
+    addUniqueIssues(issuesToProcess, projectIssues);
   }
 
   console.log(`Total issues fetched for processing: ${issuesToProcess.size}`);
-
   return issuesToProcess;
+};
+
+const isContributor = (
+  issue: GitlabIssue,
+  notes: any[],
+  userID: number,
+): boolean => {
+  if (issue.author?.id === userID) return true;
+  if (issue.assignees?.some((assignee) => assignee.id === userID)) return true;
+  return notes.some((note) => note.author?.id === userID);
 };
 
 const filterNotes = async (
@@ -145,54 +163,28 @@ const filterNotes = async (
 ) => {
   console.log("\nFiltering issues based on notes and fetch mode...");
 
-  const finalIssues = [];
+  const includeAllFetchedIssues = fetchMode === "my_issues";
+  if (!includeAllFetchedIssues && fetchMode !== "all_contributions") {
+    throw new Error(`Invalid fetch mode: ${fetchMode}`);
+  }
 
-  for (const [_id, issue] of issues.entries()) {
-    const projectID = issue.project_id;
-    const issueIID = issue.iid;
+  const finalIssues: GitlabIssue[] = [];
 
+  for (const issue of issues.values()) {
     const notesURL =
-      `${gitlabURL}/api/v4/projects/${projectID}/issues/${issueIID}/notes`;
-    const notesParams = {
+      `${gitlabURL}/api/v4/projects/${issue.project_id}/issues/${issue.iid}/notes`;
+    const notes = await getPaginatedResults(notesURL, headers, {
       sort: "asc",
       order_by: "created_at",
-    };
-    const notes = await getPaginatedResults(
-      notesURL,
-      headers,
-      notesParams,
-    );
-    issue.notes = notes;
+    });
 
-    if (fetchMode === "my_issues") {
+    issue.notes = notes;
+    if (includeAllFetchedIssues || isContributor(issue, notes, userID)) {
       finalIssues.push(issue);
-    } else if (fetchMode === "all_contributions") {
-      let isContributor = false;
-      if (issue.author && issue.author.id === userID) {
-        isContributor = true;
-      }
-      if (issue.assignees) {
-        for (const assignee of issue.assignees) {
-          if (assignee.id === userID) {
-            isContributor = true;
-            break;
-          }
-        }
-      }
-      for (const note of notes) {
-        if (note.author && note.author.id === userID) {
-          isContributor = true;
-          break;
-        }
-      }
-      if (isContributor) {
-        finalIssues.push(issue);
-      }
     }
   }
 
   console.log(`Total issues after filtering: ${finalIssues.length}`);
-
   return finalIssues;
 };
 
@@ -203,7 +195,6 @@ export const gitlabIssues = async (
   endDate: string,
   fetchMode: string,
 ) => {
-  // const finalIssues = [];
   const userID = await getUserID(gitlabURL, headers);
   const projects = await getProjects(gitlabURL, headers, userID);
 
@@ -221,13 +212,11 @@ export const gitlabIssues = async (
     return [];
   }
 
-  const finalIssues = await filterNotes(
+  return await filterNotes(
     issuesToProcess,
     gitlabURL,
     headers,
     userID,
     fetchMode,
   );
-
-  return finalIssues;
 };
