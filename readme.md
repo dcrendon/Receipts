@@ -7,69 +7,81 @@ assignee, or a participant.
 ## Features
 
 - **Multi-Provider**: Supports both GitLab and Jira.
-- **Auto-Discovery**: Automatically finds your contributions.
-- **Flexible Config**: Use a `.env` file, command-line flags, or interactive
-  prompts.
+- **Auto-Discovery**: Finds your contributions through provider APIs.
+- **Flexible Config**: Use `.env`, command-line flags, or interactive prompts.
 - **Smart Filtering**:
-  - `my_issues`: Only issues you created or are assigned to.
-  - `all_contributions`: Includes issues where you commented/participated, even
-    if not assigned.
+  - `my_issues`: only issues you created or are assigned to.
+  - `all_contributions`: includes issues where you commented/participated.
 
-## Quick Start (Windows App)
+## Developer Quickstart
 
-If prefered you can run the app directly with the pre-compiled executable
-
-1. **Download** the latest `issue-fetcher.exe` from the **Releases** section.
-2. **Generate a PAT** for your provider (GitLab or Jira).
-3. See [CLI Flags](#cli-flags) section for the full list of options
-4. **Double-click** the `.exe` file to run it.
-5. **Follow the prompts** on the screen. It will ask for your Provider, URL and
-   Token if you haven't set them up beforehand.
-6. Once it finishes, look for a new file named `gitlab_issues.json` or
-   `jira_issues.json` right next to the app.
-
-## Prerequisites
+### Prerequisites
 
 - [Deno](https://deno.com/)
 - A Personal Access Token (PAT) for GitLab or Jira.
 
-## Setup
+### Setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone git@github.com:dcrendon/gitlab-issues.git
-   cd gitlab-issues
-   ```
+```bash
+git clone git@github.com:dcrendon/gitlab-issues.git
+cd gitlab-issues
+cp .env.example .env
+```
 
-2. **Environment Variables (Optional):** You can create a `.env` file in the
-   root directory to save your credentials.
-   ```env
-   # Common
-   PROVIDER=gitlab # or jira
-   OUT_FILE=issues.json
-   TIME_RANGE=week
-   FETCH_MODE=all_contributions
-
-   # GitLab
-   GITLAB_PAT=your_gitlab_token
-   GITLAB_URL=https://gitlab.com
-
-   # Jira
-   JIRA_PAT=your_jira_token
-   JIRA_URL=https://jira.example.com
-   JIRA_USERNAME=your_username
-   ```
-
-## Usage
-
-You can run the tool directly in the CLI:
+Edit `.env` with your provider URL/token values, then run:
 
 ```bash
 deno run main.ts
 ```
 
-If you haven't set up a `.env` file or provided flags, the tool will
-interactively ask for your details.
+### Development Commands
+
+```bash
+# run CLI
+deno run main.ts
+
+# watch mode
+deno task dev
+
+# format source
+deno task fmt
+
+# current flags/help
+deno run main.ts --help
+```
+
+### Expected Outputs
+
+- `provider=gitlab`: writes `gitlab_issues.json` (or `OUT_FILE`).
+- `provider=jira`: writes `jira_issues.json` (or `OUT_FILE`).
+- `provider=all`: writes both `gitlab_issues.json` and `jira_issues.json`.
+
+## Collaboration Docs
+
+- Repo workflow and acceptance standards: `CONTRIBUTING.md`
+- Agent and reviewer operating rules: `AGENTS.md`
+- System/module map: `docs/ARCHITECTURE.md`
+
+## Quick Start (Windows App)
+
+If preferred, you can run the app directly with the pre-compiled executable.
+
+1. Download the latest `issue-fetcher.exe` from Releases.
+2. Generate a PAT for your provider (GitLab or Jira).
+3. See [CLI Flags](#cli-flags) for options.
+4. Double-click the `.exe` file to run it.
+5. Follow the prompts (provider, URL, token).
+6. Find `gitlab_issues.json` or `jira_issues.json` next to the app.
+
+## Usage
+
+Run directly in CLI:
+
+```bash
+deno run main.ts
+```
+
+If `.env` and flags are missing, the tool prompts for required values.
 
 ### CLI Flags
 
@@ -77,22 +89,23 @@ You can override defaults or environment variables using flags:
 
 | Flag             | Alias     | Description                                              | Default                |
 | :--------------- | :-------- | :------------------------------------------------------- | :--------------------- |
-| `--provider`     |           | Provider to use (`gitlab`, `jira`, `all`)                | `gitlab`               |
-| `--gitlabPAT`    | `--pat`   | Your GitLab Personal Access Token                        | _Interactive_          |
+| `--provider`     |           | Provider to use (`gitlab`, `jira`, `all`)               | `gitlab`               |
+| `--gitlabPAT`    | `--pat`   | GitLab Personal Access Token                             | _Interactive_          |
 | `--gitlabURL`    | `--url`   | GitLab instance URL                                      | _Interactive_          |
-| `--jiraPAT`      |           | Your Jira Personal Access Token                          | _Interactive_          |
+| `--jiraPAT`      |           | Jira Personal Access Token                               | _Interactive_          |
 | `--jiraURL`      |           | Jira instance URL                                        | _Interactive_          |
-| `--jiraUsername` |           | Jira Username (for JQL queries)                          | _Interactive_          |
-| `--outFile`      | `--out`   | Filename for the JSON output                             | `gitlab_issues.json`*  |
-| `--timeRange`    | `--range` | Time period to scan (`week`, `month`, `year`, `custom`)  | `week`                 |
-| `--startDate`    | `--start` | Custom start date (`MM-DD-YYYY`) - Required for `custom` | N/A                    |
-| `--endDate`      | `--end`   | Custom end date (`MM-DD-YYYY`) - Required for `custom`   | N/A                    |
-| `--fetchMode`    | `--mode`  | Scan logic (`my_issues`, `all_contributions`)            | `all_contributions`    |
+| `--jiraUsername` |           | Jira username (for JQL queries)                          | _Interactive_          |
+| `--outFile`      | `--out`   | Output filename                                          | `gitlab_issues.json`*  |
+| `--timeRange`    | `--range` | `week`, `month`, `year`, `custom`                        | `week`                 |
+| `--startDate`    | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom` | N/A                    |
+| `--endDate`      | `--end`   | Custom end date (`MM-DD-YYYY`), required for `custom`   | N/A                    |
+| `--fetchMode`    | `--mode`  | `my_issues`, `all_contributions`                         | `all_contributions`    |
 | `--help`         | `-h`      | Show help message                                        | N/A                    |
 
-\* Default output filename depends on the provider: `gitlab_issues.json` for `gitlab`, `jira_issues.json` for `jira`. When `--provider all` is used, the tool writes both `gitlab_issues.json` and `jira_issues.json`.
+\* Default output filename depends on provider. With `--provider all`, the tool
+writes both `gitlab_issues.json` and `jira_issues.json`.
 
-**Example:**
+### Examples
 
 ```bash
 # GitLab
@@ -105,7 +118,25 @@ deno run main.ts --provider jira --jiraURL https://my.jira.com --jiraUsername my
 deno run main.ts --provider all --range week
 ```
 
+## Troubleshooting
+
+- Authentication error (401/403):
+  - Verify PAT validity/scopes for selected provider.
+  - Confirm URL base matches your instance.
+- Invalid custom date:
+  - Use `MM-DD-YYYY` format for `START_DATE`/`END_DATE` or `--start`/`--end`.
+- Empty output:
+  - Widen `TIME_RANGE`.
+  - Switch `FETCH_MODE` to `all_contributions`.
+  - Confirm username (Jira) and account access to projects/issues.
+
+## Security Notes
+
+- Never commit `.env` or tokens.
+- Keep tokens in `.env` locally or pass by CLI at runtime.
+- Do not paste PAT values in issues, PRs, logs, or screenshots.
+
 ## Output
 
-The script generates a JSON file containing the raw issue data from the
-provider.
+The CLI writes raw provider issue data as JSON, including issue comments/notes
+used for contribution filtering.
