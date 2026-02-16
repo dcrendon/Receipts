@@ -7,11 +7,14 @@ import {
 import { getDateRange } from "./dates.ts";
 import { getProviderAdapters } from "./providers/index.ts";
 import { providerLabel } from "./providers/provider_meta.ts";
+import { ProviderName } from "./providers/types.ts";
+import { buildRunReport, writeRunReport } from "./reporting/reporting.ts";
 
 const main = async () => {
   const config = await generateConfig();
   const { startDate, endDate } = getDateRange(config);
   const runResults: ProviderRunResult[] = [];
+  const successfulIssues: Partial<Record<ProviderName, unknown[]>> = {};
   const adapters = getProviderAdapters();
 
   for (const adapter of adapters) {
@@ -41,6 +44,7 @@ const main = async () => {
         status: "success",
         issueCount: issues.length,
       });
+      successfulIssues[adapter.name] = issues;
     } catch (error) {
       const errorMessage = error instanceof Error
         ? error.message
@@ -57,6 +61,26 @@ const main = async () => {
   }
 
   const runStatus = evaluateRunStatus(runResults);
+
+  const successfulResults = runResults.filter((result) =>
+    result.status === "success"
+  );
+  if (successfulResults.length > 0) {
+    try {
+      const report = buildRunReport(successfulIssues, {
+        startDate,
+        endDate,
+        fetchMode: config.fetchMode,
+      });
+      const { markdownPath, normalizedPath } = await writeRunReport(report);
+      console.log(`\nSummary report written to ${markdownPath}`);
+      console.log(`Normalized issues written to ${normalizedPath}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`\nReport generation failed: ${message}`);
+    }
+  }
+
   console.log("\nRun Summary:");
   for (const result of runResults) {
     const suffix = result.status === "success"

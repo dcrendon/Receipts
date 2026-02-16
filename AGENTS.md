@@ -5,8 +5,9 @@ repository.
 
 ## Project Goal
 
-Build and maintain a Deno CLI that fetches issue activity from GitLab and Jira
-and writes JSON output for a selected time range and fetch mode.
+Build and maintain a Deno CLI that fetches issue activity from GitLab, Jira, and
+GitHub and writes provider JSON plus normalized report output for a selected
+time range and fetch mode.
 
 ## Non-Goals
 

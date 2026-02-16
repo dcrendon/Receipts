@@ -1,6 +1,6 @@
 import { Config } from "../types.ts";
 
-export type ProviderName = "gitlab" | "jira";
+export type ProviderName = "gitlab" | "jira" | "github";
 
 export interface DateWindow {
   startDate: string;

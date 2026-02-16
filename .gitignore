@@ -2,4 +2,5 @@
 gitlab_issues.json
 jira_issues.json
 gitlab-issues.exe
+reports/
 *.png

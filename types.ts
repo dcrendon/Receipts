@@ -4,12 +4,15 @@ export interface Config {
   jiraPAT?: string;
   jiraURL?: string;
   jiraUsername?: string;
+  githubPAT?: string;
+  githubURL?: string;
+  githubUsername?: string;
   useMockData: boolean;
   mockDataDir?: string;
   outFile: string;
   timeRange: string;
   fetchMode: string;
-  provider: "gitlab" | "jira" | "all";
+  provider: "gitlab" | "jira" | "github" | "all";
   startDate?: string;
   endDate?: string;
   //   projectIDs: string[];
@@ -55,5 +58,28 @@ export interface JiraIssue {
     [key: string]: unknown;
   };
   notes?: any[];
+  [key: string]: unknown;
+}
+
+export interface GitHubIssue {
+  id: number;
+  number: number;
+  title: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+  comments?: number;
+  labels?: Array<{ name?: string }>;
+  assignees?: Array<{ login?: string }>;
+  milestone?: { title?: string } | null;
+  user?: { login?: string };
+  notes?: any[];
+  metadata?: {
+    repository?: string;
+    labelNames?: string[];
+    assigneeLogins?: string[];
+    milestoneTitle?: string | null;
+    commentCount?: number;
+  };
   [key: string]: unknown;
 }

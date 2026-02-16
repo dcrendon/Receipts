@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This CLI fetches issue activity from GitLab and/or Jira for a time range, then
-writes JSON files with matching issues.
+This CLI fetches issue activity from GitLab, Jira, and/or GitHub for a time
+range, then writes JSON files with matching issues.
 
 ## Module Responsibilities
 
@@ -24,6 +24,8 @@ writes JSON files with matching issues.
   - GitLab adapter implementation for live API fetches or mock fixture mode.
 - `providers/jira_adapter.ts`
   - Jira adapter implementation for live API fetches or mock fixture mode.
+- `providers/github_adapter.ts`
+  - GitHub adapter implementation for live API fetches or mock fixture mode.
 - `config.ts`
   - Loads `.env`, parses CLI flags, prompts interactively for missing values.
   - Validates required provider inputs.
@@ -36,6 +38,10 @@ writes JSON files with matching issues.
 - `jira.ts`
   - Builds JQL and fetches issues/comments from Jira API.
   - Applies contribution filtering and null cleanup.
+- `github.ts`
+  - Uses GitHub issue search and comments APIs.
+  - Applies `my_issues` / `all_contributions` filtering and metadata enrichment
+    (labels, assignees, milestone, repository).
 - `types.ts`
   - Shared config and provider issue interfaces.
 - `mocks.ts`
@@ -43,6 +49,9 @@ writes JSON files with matching issues.
 - `http_client.ts`
   - Shared JSON HTTP client with retry/backoff and `Retry-After` handling for
     429/5xx responses.
+- `reporting/reporting.ts`
+  - Provider-agnostic normalization and aggregation pipeline.
+  - Generates run summary markdown plus normalized JSON report artifacts.
 - `tests/**/*.ts`
   - Unit and integration-style tests.
   - Current coverage includes date range behavior and provider fetch/filter
@@ -58,9 +67,13 @@ writes JSON files with matching issues.
    - Mock mode: load fixture arrays from `fixtures/*.mock.json`
    - Live mode GitLab adapter -> `gitlabIssues(...)`
    - Live mode Jira adapter -> `jiraIssues(...)`
+   - Live mode GitHub adapter -> `githubIssues(...)`
 5. Provider adapter returns filtered issue list.
-6. `main.ts` writes JSON output file(s).
-7. `main.ts` aggregates provider outcomes and exits with structured status code.
+6. `main.ts` writes provider JSON output file(s).
+7. Reporting pipeline normalizes and aggregates successful provider issues.
+8. `main.ts` writes report artifacts (`reports/*-summary.md`,
+   `reports/*-normalized.json`).
+9. `main.ts` aggregates provider outcomes and exits with structured status code.
 
 ## Provider Differences
 
@@ -73,6 +86,10 @@ writes JSON files with matching issues.
   - Uses JQL search (`/rest/api/2/search`) plus issue comments endpoint.
   - Contributor detection includes assignee, reporter, watcher in query, plus
     comment author checks.
+- GitHub:
+  - Uses issue search (`/search/issues`) plus issue comments endpoint.
+  - Contributor detection includes author/assignee/involves search qualifiers.
+  - Metadata enrichment includes repository, labels, assignees, and milestone.
 
 ## Shared Assumptions
 

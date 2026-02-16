@@ -31,6 +31,9 @@ const checkENV = async (): Promise<Partial<Config>> => {
   const jiraPAT = Deno.env.get("JIRA_PAT");
   const jiraURL = Deno.env.get("JIRA_URL");
   const jiraUsername = Deno.env.get("JIRA_USERNAME");
+  const githubPAT = Deno.env.get("GITHUB_PAT");
+  const githubURL = Deno.env.get("GITHUB_URL");
+  const githubUsername = Deno.env.get("GITHUB_USERNAME");
   const outFile = Deno.env.get("OUT_FILE");
   const timeRange = Deno.env.get("TIME_RANGE");
   const fetchMode = Deno.env.get("FETCH_MODE");
@@ -39,6 +42,7 @@ const checkENV = async (): Promise<Partial<Config>> => {
   const provider = Deno.env.get("PROVIDER") as
     | "gitlab"
     | "jira"
+    | "github"
     | "all"
     | undefined;
   const useMockData = parseBoolean(Deno.env.get("USE_MOCK_DATA") ?? undefined);
@@ -50,6 +54,9 @@ const checkENV = async (): Promise<Partial<Config>> => {
     jiraPAT,
     jiraURL,
     jiraUsername,
+    githubPAT,
+    githubURL,
+    githubUsername,
     outFile,
     timeRange,
     fetchMode,
@@ -69,7 +76,7 @@ const printHelp = () => {
       --provider
           Provider to use
           Default: gitlab
-          Options: gitlab, jira, all
+          Options: gitlab, jira, github, all
       --gitlabPAT:
           GitLab Personal Access Token - Required if provider is gitlab
           Alias: --pat
@@ -82,10 +89,17 @@ const printHelp = () => {
           Jira URL - Required if provider is jira
       --jiraUsername
           Jira Username - Required if provider is jira
+      --githubPAT:
+          GitHub Personal Access Token - Required if provider is github
+      --githubURL
+          GitHub API URL - Required if provider is github
+          Example: https://api.github.com
+      --githubUsername
+          GitHub Username - Required if provider is github
       --outFile,
           Output file name
           Alias: --out
-          Default: gitlab_issues.json or jira_issues.json (depending on provider)
+          Default: provider_issues.json (depending on provider)
       --timeRange,
           Time range for issues
           Alias: --range
@@ -127,6 +141,9 @@ export const generateConfig = async (): Promise<Config> => {
       "jiraPAT",
       "jiraURL",
       "jiraUsername",
+      "githubPAT",
+      "githubURL",
+      "githubUsername",
       "outFile",
       "timeRange",
       "fetchMode",
@@ -160,7 +177,7 @@ export const generateConfig = async (): Promise<Config> => {
   );
 
   const combinedConfig: Partial<Config> = {
-    provider: (args.provider as "gitlab" | "jira" | "all") ??
+    provider: (args.provider as "gitlab" | "jira" | "github" | "all") ??
       envConfig.provider ??
       "gitlab",
     gitlabPAT: args.gitlabPAT ?? envConfig.gitlabPAT,
@@ -168,6 +185,9 @@ export const generateConfig = async (): Promise<Config> => {
     jiraPAT: args.jiraPAT ?? envConfig.jiraPAT,
     jiraURL: args.jiraURL ?? envConfig.jiraURL,
     jiraUsername: args.jiraUsername ?? envConfig.jiraUsername,
+    githubPAT: args.githubPAT ?? envConfig.githubPAT,
+    githubURL: args.githubURL ?? envConfig.githubURL,
+    githubUsername: args.githubUsername ?? envConfig.githubUsername,
     outFile: args.outFile ?? envConfig.outFile,
     timeRange: args.timeRange ?? envConfig.timeRange ?? "week",
     fetchMode: args.fetchMode ?? envConfig.fetchMode ?? "all_contributions",
@@ -183,6 +203,8 @@ export const generateConfig = async (): Promise<Config> => {
   if (!combinedConfig.outFile) {
     if (combinedConfig.provider === "jira") {
       combinedConfig.outFile = "jira_issues.json";
+    } else if (combinedConfig.provider === "github") {
+      combinedConfig.outFile = "github_issues.json";
     } else if (combinedConfig.provider === "gitlab") {
       combinedConfig.outFile = "gitlab_issues.json";
     } else {
@@ -259,6 +281,41 @@ export const generateConfig = async (): Promise<Config> => {
     }
   }
 
+  // Validate GitHub Config
+  if (
+    !combinedConfig.useMockData &&
+    (combinedConfig.provider === "github" || combinedConfig.provider === "all")
+  ) {
+    if (!combinedConfig.githubPAT) {
+      const githubPAT = promptSecret(
+        "Enter your GitHub Personal Access Token:",
+        { mask: "*" },
+      );
+      if (!githubPAT) {
+        promptExit("GitHub Personal Access Token is required.", 1);
+      }
+      combinedConfig.githubPAT = githubPAT as string;
+    }
+
+    if (!combinedConfig.githubURL) {
+      const githubURL = prompt(
+        "Enter your GitHub API URL (e.g., https://api.github.com):",
+      );
+      if (!githubURL) {
+        promptExit("GitHub API URL is required.", 1);
+      }
+      combinedConfig.githubURL = githubURL as string;
+    }
+
+    if (!combinedConfig.githubUsername) {
+      const githubUsername = prompt("Enter your GitHub Username:");
+      if (!githubUsername) {
+        promptExit("GitHub Username is required.", 1);
+      }
+      combinedConfig.githubUsername = githubUsername as string;
+    }
+  }
+
   const finalConfig: Config = combinedConfig as Config;
 
   console.log(`
@@ -266,14 +323,16 @@ Configuration:
   - Provider: ${finalConfig.provider}
   - URL(s): ${
     finalConfig.provider === "all"
-      ? `GitLab: ${finalConfig.gitlabURL}, Jira: ${finalConfig.jiraURL}`
+      ? `GitLab: ${finalConfig.gitlabURL}, Jira: ${finalConfig.jiraURL}, GitHub: ${finalConfig.githubURL}`
       : finalConfig.provider === "gitlab"
       ? finalConfig.gitlabURL
+      : finalConfig.provider === "github"
+      ? finalConfig.githubURL
       : finalConfig.jiraURL
   }
   - Output File(s): ${
     finalConfig.provider === "all"
-      ? "gitlab_issues.json, jira_issues.json"
+      ? "gitlab_issues.json, jira_issues.json, github_issues.json"
       : finalConfig.outFile
   }
   - Time Range: ${finalConfig.timeRange}

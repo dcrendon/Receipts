@@ -1,4 +1,4 @@
-type MockProvider = "gitlab" | "jira";
+type MockProvider = "gitlab" | "jira" | "github";
 
 export const loadMockIssues = async (
   provider: MockProvider,
