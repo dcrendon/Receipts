@@ -6,7 +6,9 @@ export const promptExit = (message: string | null, exitCode: number): never => {
   if (message) {
     console.log(message);
   }
-  prompt("\nPress Enter to close...");
+  if (Deno.stdin.isTerminal()) {
+    prompt("\nPress Enter to close...");
+  }
   Deno.exit(exitCode);
 };
 

@@ -31,6 +31,8 @@ CLI run for the touched provider path.
 - Keep changes focused and minimal; avoid broad refactors unless requested.
 - Do not log PATs, auth headers, or full secret-bearing config.
 - Prefer explicit error handling with actionable messages.
+- Keep runtime exit semantics machine-friendly (structured exit codes and no
+  interactive blocking in non-interactive runs).
 - Keep provider behavior consistent unless a behavior change is required.
 
 ## Change Policy

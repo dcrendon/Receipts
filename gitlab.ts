@@ -1,4 +1,3 @@
-import { promptExit } from "./config.ts";
 import { GitlabIssue } from "./types.ts";
 
 const getPaginatedResults = async (
@@ -27,7 +26,7 @@ const getPaginatedResults = async (
       });
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch paginated results: ${response.statusText}`,
+          `GitLab request failed: ${response.status} ${response.statusText}`,
         );
       }
       const data = await response.json();
@@ -37,8 +36,7 @@ const getPaginatedResults = async (
       allIssues.push(...data);
       page++;
     } catch (error) {
-      console.error(`${error}`);
-      break;
+      throw error;
     }
   }
 
@@ -55,7 +53,9 @@ const getUserID = async (
     headers,
   });
   if (!response.ok) {
-    promptExit(`Failed to fetch user information: ${response.statusText}`, 1);
+    throw new Error(
+      `Failed to fetch GitLab user information: ${response.status} ${response.statusText}`,
+    );
   }
   const data = await response.json();
 
@@ -138,7 +138,7 @@ const getIssues = async (
         issuesToProcess.set(issue.id, issue);
       }
     } else {
-      promptExit(`Invalid fetch mode: ${fetchMode}`, 1);
+      throw new Error(`Invalid fetch mode: ${fetchMode}`);
     }
   }
 

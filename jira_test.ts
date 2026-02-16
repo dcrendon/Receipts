@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { jiraIssues } from "./jira.ts";
 
 const makeJsonResponse = (body: unknown, status = 200): Response => {
@@ -79,7 +79,7 @@ Deno.test("jiraIssues returns filtered contribution issues with comments", async
   }
 });
 
-Deno.test("jiraIssues returns empty list when search request fails", async () => {
+Deno.test("jiraIssues throws when search request fails", async () => {
   const originalFetch = globalThis.fetch;
 
   try {
@@ -97,16 +97,17 @@ Deno.test("jiraIssues returns empty list when search request fails", async () =>
       return makeJsonResponse({}, 404);
     }) as typeof fetch;
 
-    const issues = await jiraIssues(
-      "https://jira.example.com",
-      { Authorization: "Bearer token", "Content-Type": "application/json" },
-      "my.user",
-      "2026-02-01T00:00:00.000Z",
-      "2026-02-16T23:59:59.999Z",
-      "my_issues",
+    await assertRejects(
+      () =>
+        jiraIssues(
+          "https://jira.example.com",
+          { Authorization: "Bearer token", "Content-Type": "application/json" },
+          "my.user",
+          "2026-02-01T00:00:00.000Z",
+          "2026-02-16T23:59:59.999Z",
+          "my_issues",
+        ),
     );
-
-    assertEquals(issues.length, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

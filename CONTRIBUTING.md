@@ -9,6 +9,8 @@
    - `deno task fmt`
    - `deno test` (or `deno task test`)
    - `deno run main.ts --help`
+   - Verify exit behavior for changed runtime flows (`0` success, `1` failed,
+     `2` partial)
    - A representative provider run when behavior changes.
 4. Update docs/policy files impacted by your change:
    - `readme.md`, `docs/ARCHITECTURE.md`, `AGENTS.md`, `CONTRIBUTING.md`

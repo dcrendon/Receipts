@@ -61,6 +61,15 @@ deno run main.ts --help
 - `provider=jira`: writes `jira_issues.json` (or `OUT_FILE`).
 - `provider=all`: writes both `gitlab_issues.json` and `jira_issues.json`.
 
+### Exit Codes
+
+- `0`: `SUCCESS` (all requested providers completed successfully)
+- `1`: `FAILED` (all requested providers failed)
+- `2`: `PARTIAL` (some providers succeeded, some failed)
+
+In non-interactive environments (CI/scripts), the CLI exits immediately without
+waiting for an Enter key prompt.
+
 ## Collaboration Docs
 
 - Repo workflow and acceptance standards: `CONTRIBUTING.md`

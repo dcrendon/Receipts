@@ -10,7 +10,8 @@ writes JSON files with matching issues.
 - `main.ts`
   - Entry point.
   - Generates config, computes date range, dispatches provider fetches.
-  - Writes output files and exits with final status.
+  - Writes output files and evaluates run status (`SUCCESS`, `PARTIAL`,
+    `FAILED`) with structured exit codes (0, 2, 1).
 - `config.ts`
   - Loads `.env`, parses CLI flags, prompts interactively for missing values.
   - Validates required provider inputs.
@@ -39,6 +40,7 @@ writes JSON files with matching issues.
    - Jira: `jiraIssues(...)`
 4. Provider module returns filtered issue list.
 5. `main.ts` writes JSON output file(s).
+6. `main.ts` aggregates provider outcomes and exits with structured status code.
 
 ## Provider Differences
 
@@ -58,6 +60,7 @@ writes JSON files with matching issues.
 - Date filtering is bounded by computed ISO start/end values.
 - Output is raw provider issue JSON plus `notes` for comments.
 - No long-term state is persisted beyond output files.
+- Provider API failures are explicit errors, not silent partial fetches.
 
 ## Validation And Quality Gates
 

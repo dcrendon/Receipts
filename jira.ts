@@ -1,5 +1,3 @@
-import { promptExit } from "./config.ts";
-
 const getPaginatedResults = async (
   jiraURL: string,
   headers: Record<string, string>,
@@ -43,8 +41,7 @@ const getPaginatedResults = async (
         break;
       }
     } catch (error) {
-      console.error(`${error}`);
-      break;
+      throw error;
     }
   }
 
@@ -140,7 +137,7 @@ export const jiraIssues = async (
     jql =
       `(assignee = "${safeUser}" OR reporter = "${safeUser}" OR watcher = "${safeUser}") AND updated >= "${jqlStart}" AND updated <= "${jqlEnd}"`;
   } else {
-    promptExit(`Invalid fetch mode: ${fetchMode}`, 1);
+    throw new Error(`Invalid fetch mode: ${fetchMode}`);
   }
 
   console.log(`\nFetching Jira issues...`);
