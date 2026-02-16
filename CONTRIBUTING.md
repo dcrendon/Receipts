@@ -9,6 +9,8 @@
    - `deno task fmt`
    - `deno test` (or `deno task test`)
    - `deno run main.ts --help`
+   - Optional offline behavior check:
+     `deno run --allow-read --allow-env main.ts --provider all --mock`
    - Verify exit behavior for changed runtime flows (`0` success, `1` failed,
      `2` partial)
    - A representative provider run when behavior changes.

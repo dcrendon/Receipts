@@ -53,6 +53,9 @@ deno task test
 
 # current flags/help
 deno run main.ts --help
+
+# offline run with local fixtures (no provider credentials required)
+deno run --allow-read --allow-env main.ts --provider all --mock
 ```
 
 ### Expected Outputs
@@ -110,26 +113,30 @@ Run directly in CLI:
 deno run main.ts
 ```
 
-If `.env` and flags are missing, the tool prompts for required values.
+If `.env` and flags are missing, the tool prompts for required values. When
+`--mock`/`--useMockData` is enabled, provider API calls are skipped and fixture
+files are used instead.
 
 ### CLI Flags
 
 You can override defaults or environment variables using flags:
 
-| Flag             | Alias     | Description                                             | Default               |
-| :--------------- | :-------- | :------------------------------------------------------ | :-------------------- |
-| `--provider`     |           | Provider to use (`gitlab`, `jira`, `all`)               | `gitlab`              |
-| `--gitlabPAT`    | `--pat`   | GitLab Personal Access Token                            | _Interactive_         |
-| `--gitlabURL`    | `--url`   | GitLab instance URL                                     | _Interactive_         |
-| `--jiraPAT`      |           | Jira Personal Access Token                              | _Interactive_         |
-| `--jiraURL`      |           | Jira instance URL                                       | _Interactive_         |
-| `--jiraUsername` |           | Jira username (for JQL queries)                         | _Interactive_         |
-| `--outFile`      | `--out`   | Output filename                                         | `gitlab_issues.json`* |
-| `--timeRange`    | `--range` | `week`, `month`, `year`, `custom`                       | `week`                |
-| `--startDate`    | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom` | N/A                   |
-| `--endDate`      | `--end`   | Custom end date (`MM-DD-YYYY`), required for `custom`   | N/A                   |
-| `--fetchMode`    | `--mode`  | `my_issues`, `all_contributions`                        | `all_contributions`   |
-| `--help`         | `-h`      | Show help message                                       | N/A                   |
+| Flag             | Alias     | Description                                                                 | Default               |
+| :--------------- | :-------- | :-------------------------------------------------------------------------- | :-------------------- |
+| `--provider`     |           | Provider to use (`gitlab`, `jira`, `all`)                                   | `gitlab`              |
+| `--gitlabPAT`    | `--pat`   | GitLab Personal Access Token                                                | _Interactive_         |
+| `--gitlabURL`    | `--url`   | GitLab instance URL                                                         | _Interactive_         |
+| `--jiraPAT`      |           | Jira Personal Access Token                                                  | _Interactive_         |
+| `--jiraURL`      |           | Jira instance URL                                                           | _Interactive_         |
+| `--jiraUsername` |           | Jira username (for JQL queries)                                             | _Interactive_         |
+| `--outFile`      | `--out`   | Output filename                                                             | `gitlab_issues.json`* |
+| `--timeRange`    | `--range` | `week`, `month`, `year`, `custom`                                           | `week`                |
+| `--startDate`    | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom`                     | N/A                   |
+| `--endDate`      | `--end`   | Custom end date (`MM-DD-YYYY`), required for `custom`                       | N/A                   |
+| `--fetchMode`    | `--mode`  | `my_issues`, `all_contributions`                                            | `all_contributions`   |
+| `--useMockData`  | `--mock`  | Use local fixture files instead of provider APIs                            | `false`               |
+| `--mockDataDir`  |           | Fixture directory path (`gitlab_issues.mock.json`, `jira_issues.mock.json`) | `fixtures`            |
+| `--help`         | `-h`      | Show help message                                                           | N/A                   |
 
 \* Default output filename depends on provider. With `--provider all`, the tool
 writes both `gitlab_issues.json` and `jira_issues.json`.
@@ -145,6 +152,9 @@ deno run main.ts --provider jira --jiraURL https://my.jira.com --jiraUsername my
 
 # Both
 deno run main.ts --provider all --range week
+
+# Offline local run (uses fixtures/*.mock.json)
+deno run --allow-read --allow-env main.ts --provider all --mock
 ```
 
 ## Troubleshooting

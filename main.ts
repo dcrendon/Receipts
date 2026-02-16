@@ -1,9 +1,9 @@
 import { generateConfig, promptExit } from "./config.ts";
 import { getDateRange } from "./dates.ts";
-import { gitlabIssues } from "./gitlab.ts";
-import { jiraIssues } from "./jira.ts";
+import { GitLabAdapter } from "./providers/gitlab_adapter.ts";
+import { JiraAdapter } from "./providers/jira_adapter.ts";
+import { ProviderAdapter, ProviderName } from "./providers/types.ts";
 
-type ProviderName = "gitlab" | "jira";
 type ProviderStatus = "success" | "failed";
 type RunStatus = "SUCCESS" | "PARTIAL" | "FAILED";
 
@@ -18,6 +18,10 @@ const EXIT_CODES: Record<RunStatus, number> = {
   SUCCESS: 0,
   FAILED: 1,
   PARTIAL: 2,
+};
+
+const getProviderAdapters = (): ProviderAdapter[] => {
+  return [new GitLabAdapter(), new JiraAdapter()];
 };
 
 export const evaluateRunStatus = (results: ProviderRunResult[]): RunStatus => {
@@ -39,84 +43,32 @@ const main = async () => {
   const config = await generateConfig();
   const { startDate, endDate } = getDateRange(config);
   const runResults: ProviderRunResult[] = [];
+  const adapters = getProviderAdapters();
 
-  if (config.provider === "gitlab" || config.provider === "all") {
-    try {
-      const headers = {
-        "PRIVATE-TOKEN": config.gitlabPAT!,
-      };
-      const outFile = config.provider === "all"
-        ? "gitlab_issues.json"
-        : config.outFile;
-
-      const issues = await gitlabIssues(
-        config.gitlabURL!,
-        headers,
-        startDate,
-        endDate,
-        config.fetchMode,
-      );
-
-      if (!issues.length) {
-        console.log("\nNo GitLab issues found for the specified criteria.");
-      } else {
-        await Deno.writeTextFile(
-          outFile,
-          JSON.stringify(issues, null, 2),
-        );
-        console.log(`\nGitLab issue data written to ${outFile}`);
-      }
-
-      runResults.push({
-        provider: "gitlab",
-        status: "success",
-        issueCount: issues.length,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : String(error);
-      console.error(`\nGitLab provider failed: ${errorMessage}`);
-      runResults.push({
-        provider: "gitlab",
-        status: "failed",
-        issueCount: 0,
-        error: errorMessage,
-      });
+  for (const adapter of adapters) {
+    if (!adapter.canRun(config)) {
+      continue;
     }
-  }
 
-  if (config.provider === "jira" || config.provider === "all") {
     try {
-      const headers = {
-        "Authorization": `Bearer ${config.jiraPAT}`,
-        "Content-Type": "application/json",
-      };
-      const outFile = config.provider === "all"
-        ? "jira_issues.json"
-        : config.outFile;
-
-      const issues = await jiraIssues(
-        config.jiraURL!,
-        headers,
-        config.jiraUsername!,
-        startDate,
-        endDate,
-        config.fetchMode,
-      );
+      const outFile = adapter.getOutFile(config);
+      const issues = await adapter.fetchIssues(config, { startDate, endDate });
+      const providerTitle = adapter.name === "gitlab" ? "GitLab" : "Jira";
 
       if (!issues.length) {
-        console.log("\nNo Jira issues found for the specified criteria.");
+        console.log(
+          `\nNo ${providerTitle} issues found for the specified criteria.`,
+        );
       } else {
         await Deno.writeTextFile(
           outFile,
           JSON.stringify(issues, null, 2),
         );
-        console.log(`\nJira issue data written to ${outFile}`);
+        console.log(`\n${providerTitle} issue data written to ${outFile}`);
       }
 
       runResults.push({
-        provider: "jira",
+        provider: adapter.name,
         status: "success",
         issueCount: issues.length,
       });
@@ -124,9 +76,10 @@ const main = async () => {
       const errorMessage = error instanceof Error
         ? error.message
         : String(error);
-      console.error(`\nJira provider failed: ${errorMessage}`);
+      const providerTitle = adapter.name === "gitlab" ? "GitLab" : "Jira";
+      console.error(`\n${providerTitle} provider failed: ${errorMessage}`);
       runResults.push({
-        provider: "jira",
+        provider: adapter.name,
         status: "failed",
         issueCount: 0,
         error: errorMessage,

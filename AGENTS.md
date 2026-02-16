@@ -18,6 +18,8 @@ and writes JSON output for a selected time range and fetch mode.
 ## Canonical Commands
 
 - Run CLI: `deno run main.ts`
+- Run CLI (offline fixtures):
+  `deno run --allow-read --allow-env main.ts --provider all --mock`
 - Run with watch: `deno task dev`
 - Format: `deno task fmt`
 - Test suite: `deno test` (or `deno task test`)

@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1001,
+    "iid": 42,
+    "project_id": 77,
+    "title": "Improve issue fetcher retry behavior",
+    "state": "opened",
+    "author": {
+      "id": 7,
+      "username": "mock.user"
+    },
+    "assignees": [
+      {
+        "id": 7,
+        "username": "mock.user"
+      }
+    ],
+    "created_at": "2026-02-10T09:30:00Z",
+    "updated_at": "2026-02-14T12:45:00Z",
+    "notes": [
+      {
+        "id": 9001,
+        "body": "Added retry logic details.",
+        "created_at": "2026-02-14T12:45:00Z",
+        "author": {
+          "id": 7,
+          "username": "mock.user"
+        }
+      }
+    ]
+  },
+  {
+    "id": 1002,
+    "iid": 43,
+    "project_id": 77,
+    "title": "Add docs quality gate",
+    "state": "closed",
+    "author": {
+      "id": 21,
+      "username": "teammate"
+    },
+    "assignees": [
+      {
+        "id": 7,
+        "username": "mock.user"
+      }
+    ],
+    "created_at": "2026-02-08T08:15:00Z",
+    "updated_at": "2026-02-15T15:20:00Z",
+    "notes": [
+      {
+        "id": 9002,
+        "body": "Verified acceptance criteria.",
+        "created_at": "2026-02-15T15:20:00Z",
+        "author": {
+          "id": 7,
+          "username": "mock.user"
+        }
+      }
+    ]
+  }
+]

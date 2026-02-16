@@ -4,6 +4,8 @@ export interface Config {
   jiraPAT?: string;
   jiraURL?: string;
   jiraUsername?: string;
+  useMockData: boolean;
+  mockDataDir?: string;
   outFile: string;
   timeRange: string;
   fetchMode: string;

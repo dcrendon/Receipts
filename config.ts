@@ -12,6 +12,18 @@ export const promptExit = (message: string | null, exitCode: number): never => {
   Deno.exit(exitCode);
 };
 
+const parseBoolean = (value?: string): boolean | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+};
+
 const checkENV = async (): Promise<Partial<Config>> => {
   await load({ export: true });
   const gitlabPAT = Deno.env.get("GITLAB_PAT");
@@ -29,6 +41,8 @@ const checkENV = async (): Promise<Partial<Config>> => {
     | "jira"
     | "all"
     | undefined;
+  const useMockData = parseBoolean(Deno.env.get("USE_MOCK_DATA") ?? undefined);
+  const mockDataDir = Deno.env.get("MOCK_DATA_DIR");
   // const projectIDs = Deno.env.get("PROJECT_IDS")?.split(",");
   const envParams: Partial<Config> = {
     gitlabPAT,
@@ -42,6 +56,8 @@ const checkENV = async (): Promise<Partial<Config>> => {
     startDate,
     endDate,
     provider,
+    useMockData,
+    mockDataDir,
     // projectIDs,
   };
   return envParams;
@@ -89,6 +105,14 @@ const printHelp = () => {
       --help,
           Show this help message.
           alias: -h
+      --useMockData
+          Use local fixture files instead of provider APIs
+          Alias: --mock
+          Env: USE_MOCK_DATA=true
+      --mockDataDir
+          Directory containing mock fixture files
+          Default: fixtures
+          Env: MOCK_DATA_DIR
   `);
   promptExit(null, 0);
 };
@@ -109,11 +133,13 @@ export const generateConfig = async (): Promise<Config> => {
       "startDate",
       "endDate",
       "provider",
+      "mockDataDir",
     ],
     // collect: ["projectIDs"],
-    boolean: ["help"],
+    boolean: ["help", "useMockData"],
     alias: {
       help: "h",
+      useMockData: "mock",
       gitlabPAT: "pat",
       gitlabURL: "url",
       outFile: "out",
@@ -128,6 +154,10 @@ export const generateConfig = async (): Promise<Config> => {
   if (args.help) {
     printHelp();
   }
+  const hasUseMockDataArg = Object.prototype.hasOwnProperty.call(
+    args,
+    "useMockData",
+  );
 
   const combinedConfig: Partial<Config> = {
     provider: (args.provider as "gitlab" | "jira" | "all") ??
@@ -143,6 +173,10 @@ export const generateConfig = async (): Promise<Config> => {
     fetchMode: args.fetchMode ?? envConfig.fetchMode ?? "all_contributions",
     startDate: args.startDate ?? envConfig.startDate,
     endDate: args.endDate ?? envConfig.endDate,
+    useMockData: hasUseMockDataArg
+      ? Boolean(args.useMockData)
+      : envConfig.useMockData ?? false,
+    mockDataDir: args.mockDataDir ?? envConfig.mockDataDir,
     // projectIDs: (args.projectIDs as string[]) ?? envConfig.projectIDs,
   };
 
@@ -159,7 +193,8 @@ export const generateConfig = async (): Promise<Config> => {
 
   // Validate GitLab Config
   if (
-    combinedConfig.provider === "gitlab" || combinedConfig.provider === "all"
+    !combinedConfig.useMockData &&
+    (combinedConfig.provider === "gitlab" || combinedConfig.provider === "all")
   ) {
     if (!combinedConfig.gitlabPAT) {
       const gitlabPAT = promptSecret(
@@ -186,7 +221,10 @@ export const generateConfig = async (): Promise<Config> => {
   }
 
   // Validate Jira Config
-  if (combinedConfig.provider === "jira" || combinedConfig.provider === "all") {
+  if (
+    !combinedConfig.useMockData &&
+    (combinedConfig.provider === "jira" || combinedConfig.provider === "all")
+  ) {
     if (!combinedConfig.jiraPAT) {
       const jiraPAT = promptSecret(
         "Enter your Jira Personal Access Token:",
@@ -239,7 +277,9 @@ Configuration:
       : finalConfig.outFile
   }
   - Time Range: ${finalConfig.timeRange}
-  - Fetch Mode: ${finalConfig.fetchMode}`);
+  - Fetch Mode: ${finalConfig.fetchMode}
+  - Mock Data: ${finalConfig.useMockData ? "enabled" : "disabled"}
+  - Mock Dir: ${finalConfig.mockDataDir ?? "fixtures"}`);
 
   return finalConfig;
 };

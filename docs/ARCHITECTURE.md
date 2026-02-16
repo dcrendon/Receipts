@@ -9,9 +9,16 @@ writes JSON files with matching issues.
 
 - `main.ts`
   - Entry point.
-  - Generates config, computes date range, dispatches provider fetches.
+  - Generates config, computes date range, dispatches provider fetches through
+    provider adapters.
   - Writes output files and evaluates run status (`SUCCESS`, `PARTIAL`,
     `FAILED`) with structured exit codes (0, 2, 1).
+- `providers/types.ts`
+  - Shared adapter contract (`ProviderAdapter`) and provider/date-window types.
+- `providers/gitlab_adapter.ts`
+  - GitLab adapter implementation for live API fetches or mock fixture mode.
+- `providers/jira_adapter.ts`
+  - Jira adapter implementation for live API fetches or mock fixture mode.
 - `config.ts`
   - Loads `.env`, parses CLI flags, prompts interactively for missing values.
   - Validates required provider inputs.
@@ -26,6 +33,8 @@ writes JSON files with matching issues.
   - Applies contribution filtering and null cleanup.
 - `types.ts`
   - Shared config and provider issue interfaces.
+- `mocks.ts`
+  - Loads local fixture files for offline runs when mock mode is enabled.
 - `*_test.ts`
   - Unit and integration-style tests.
   - Current coverage includes date range behavior and provider fetch/filter
@@ -35,12 +44,14 @@ writes JSON files with matching issues.
 
 1. `main.ts` calls `generateConfig()` from `config.ts`.
 2. `main.ts` calls `getDateRange()` from `dates.ts`.
-3. Provider fetch path:
-   - GitLab: `gitlabIssues(...)`
-   - Jira: `jiraIssues(...)`
-4. Provider module returns filtered issue list.
-5. `main.ts` writes JSON output file(s).
-6. `main.ts` aggregates provider outcomes and exits with structured status code.
+3. `main.ts` resolves adapters and executes enabled provider adapters.
+4. Adapter fetch path:
+   - Mock mode: load fixture arrays from `fixtures/*.mock.json`
+   - Live mode GitLab adapter -> `gitlabIssues(...)`
+   - Live mode Jira adapter -> `jiraIssues(...)`
+5. Provider adapter returns filtered issue list.
+6. `main.ts` writes JSON output file(s).
+7. `main.ts` aggregates provider outcomes and exits with structured status code.
 
 ## Provider Differences
 
