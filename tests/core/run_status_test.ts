@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { evaluateRunStatus } from "./main.ts";
+import { evaluateRunStatus } from "../../core/run_status.ts";
 
 Deno.test("evaluateRunStatus returns SUCCESS when all providers succeed", () => {
   const status = evaluateRunStatus([

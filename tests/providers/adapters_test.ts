@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
-import { GitLabAdapter } from "./gitlab_adapter.ts";
-import { JiraAdapter } from "./jira_adapter.ts";
-import { Config } from "../types.ts";
+import { Config } from "../../types.ts";
+import { GitLabAdapter } from "../../providers/gitlab_adapter.ts";
+import { JiraAdapter } from "../../providers/jira_adapter.ts";
 
 const baseConfig = (overrides: Partial<Config> = {}): Config => {
   return {

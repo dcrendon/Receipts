@@ -9,10 +9,15 @@ writes JSON files with matching issues.
 
 - `main.ts`
   - Entry point.
-  - Generates config, computes date range, dispatches provider fetches through
-    provider adapters.
-  - Writes output files and evaluates run status (`SUCCESS`, `PARTIAL`,
-    `FAILED`) with structured exit codes (0, 2, 1).
+  - Generates config, computes date range, orchestrates provider execution.
+  - Writes output files and exits using evaluated run status.
+- `core/run_status.ts`
+  - Shared run outcome model (`SUCCESS`, `PARTIAL`, `FAILED`), summary
+    evaluation, and exit-code mapping.
+- `providers/index.ts`
+  - Provider adapter registry/factory used by `main.ts`.
+- `providers/provider_meta.ts`
+  - Provider display metadata (labels used in logs/output).
 - `providers/types.ts`
   - Shared adapter contract (`ProviderAdapter`) and provider/date-window types.
 - `providers/gitlab_adapter.ts`
@@ -38,7 +43,7 @@ writes JSON files with matching issues.
 - `http_client.ts`
   - Shared JSON HTTP client with retry/backoff and `Retry-After` handling for
     429/5xx responses.
-- `*_test.ts`
+- `tests/**/*.ts`
   - Unit and integration-style tests.
   - Current coverage includes date range behavior and provider fetch/filter
     flows with mocked HTTP responses.
@@ -47,7 +52,8 @@ writes JSON files with matching issues.
 
 1. `main.ts` calls `generateConfig()` from `config.ts`.
 2. `main.ts` calls `getDateRange()` from `dates.ts`.
-3. `main.ts` resolves adapters and executes enabled provider adapters.
+3. `main.ts` gets adapters from `providers/index.ts` and executes enabled
+   provider adapters.
 4. Adapter fetch path:
    - Mock mode: load fixture arrays from `fixtures/*.mock.json`
    - Live mode GitLab adapter -> `gitlabIssues(...)`
