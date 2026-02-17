@@ -6,41 +6,65 @@ import { JiraAdapter } from "../../providers/jira_adapter.ts";
 
 const baseConfig = (overrides: Partial<Config> = {}): Config => {
   return {
-    provider: "gitlab",
+    provider: "all",
     outFile: "issues.json",
     timeRange: "week",
     fetchMode: "all_contributions",
+    reportProfile: "activity_retro",
+    reportFormat: "html",
+    aiNarrative: "auto",
+    aiModel: "gpt-4o-mini",
+    gitlabPAT: "gitlab-token",
+    gitlabURL: "https://gitlab.com",
+    jiraPAT: "jira-token",
+    jiraURL: "https://jira.example.com",
+    jiraUsername: "jira-user",
+    githubPAT: "github-token",
+    githubURL: "https://api.github.com",
+    githubUsername: "github-user",
     ...overrides,
   };
 };
 
-Deno.test("GitLabAdapter canRun/getOutFile follow provider selection", () => {
+Deno.test("GitLabAdapter canRun/getOutFile follow provider selection and readiness", () => {
   const adapter = new GitLabAdapter();
   assertEquals(adapter.canRun(baseConfig({ provider: "gitlab" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "all" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "jira" })), false);
+  assertEquals(
+    adapter.canRun(baseConfig({ provider: "gitlab", gitlabPAT: undefined })),
+    false,
+  );
   assertEquals(
     adapter.getOutFile(baseConfig({ provider: "all", outFile: "custom.json" })),
     "output/gitlab_issues.json",
   );
 });
 
-Deno.test("JiraAdapter canRun/getOutFile follow provider selection", () => {
+Deno.test("JiraAdapter canRun/getOutFile follow provider selection and readiness", () => {
   const adapter = new JiraAdapter();
   assertEquals(adapter.canRun(baseConfig({ provider: "jira" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "all" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "gitlab" })), false);
+  assertEquals(
+    adapter.canRun(baseConfig({ provider: "jira", jiraUsername: undefined })),
+    false,
+  );
   assertEquals(
     adapter.getOutFile(baseConfig({ provider: "all", outFile: "custom.json" })),
     "output/jira_issues.json",
   );
 });
 
-Deno.test("GitHubAdapter canRun/getOutFile follow provider selection", () => {
+Deno.test("GitHubAdapter canRun/getOutFile follow provider selection and readiness", () => {
   const adapter = new GitHubAdapter();
   assertEquals(adapter.canRun(baseConfig({ provider: "github" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "all" })), true);
   assertEquals(adapter.canRun(baseConfig({ provider: "jira" })), false);
+  assertEquals(
+    adapter.canRun(baseConfig({ provider: "github", githubURL: undefined })),
+    false,
+  );
   assertEquals(
     adapter.getOutFile(baseConfig({ provider: "all", outFile: "custom.json" })),
     "output/github_issues.json",

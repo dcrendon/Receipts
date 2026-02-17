@@ -1,5 +1,19 @@
 import { promptSecret } from "@std/cli";
 import { Config } from "../shared/types.ts";
+import {
+  AI_NARRATIVE_MODES,
+  parseAiNarrativeMode,
+  parseReportFormat,
+  parseReportProfile,
+  REPORT_FORMATS,
+  REPORT_PROFILES,
+} from "./report_options.ts";
+import {
+  getMissingFieldsForProvider,
+  getProviderReadiness,
+  providerLabel,
+} from "./provider_readiness.ts";
+import { ProviderName } from "../providers/types.ts";
 
 const PROVIDERS = ["gitlab", "jira", "github", "all"] as const;
 const TIME_RANGES = ["week", "month", "year", "custom"] as const;
@@ -79,27 +93,119 @@ const askRequiredSecret = (question: string, defaultValue?: string): string => {
   }
 };
 
-const providerSelected = (
-  runProvider: Config["provider"],
-  provider: "gitlab" | "jira" | "github",
-) => {
-  return runProvider === provider || runProvider === "all";
+const describeMissingField = (field: keyof Config): string => {
+  if (field === "gitlabPAT") return "GitLab PAT";
+  if (field === "gitlabURL") return "GitLab URL";
+  if (field === "jiraPAT") return "Jira PAT";
+  if (field === "jiraURL") return "Jira URL";
+  if (field === "jiraUsername") return "Jira username";
+  if (field === "githubPAT") return "GitHub PAT";
+  if (field === "githubURL") return "GitHub URL";
+  if (field === "githubUsername") return "GitHub username";
+  return String(field);
+};
+
+export const formatProviderReadinessSummary = (config: Config): string[] => {
+  const readiness = getProviderReadiness(config);
+  const lines = ["\nProvider readiness:"];
+
+  for (const provider of readiness.selectedProviders) {
+    const missing = readiness.missingByProvider[provider] ?? [];
+    if (missing.length === 0) {
+      lines.push(`- ${providerLabel(provider)}: ready`);
+    } else {
+      lines.push(
+        `- ${providerLabel(provider)}: missing ${
+          missing.map(describeMissingField).join(", ")
+        }`,
+      );
+    }
+  }
+
+  return lines;
+};
+
+const captureProviderCredentials = (
+  config: Config,
+  provider: ProviderName,
+): void => {
+  const missing = getMissingFieldsForProvider(config, provider);
+  if (!missing.length) {
+    return;
+  }
+
+  console.log(`\n${providerLabel(provider)} is missing required credentials.`);
+
+  for (const field of missing) {
+    if (field === "gitlabPAT") {
+      config.gitlabPAT = askRequiredSecret(
+        "Enter GitLab Personal Access Token",
+      );
+      continue;
+    }
+    if (field === "gitlabURL") {
+      config.gitlabURL = askRequiredText(
+        "Enter GitLab URL (e.g., https://gitlab.com)",
+        config.gitlabURL,
+      );
+      continue;
+    }
+    if (field === "jiraPAT") {
+      config.jiraPAT = askRequiredSecret("Enter Jira Personal Access Token");
+      continue;
+    }
+    if (field === "jiraURL") {
+      config.jiraURL = askRequiredText(
+        "Enter Jira URL (e.g., https://jira.example.com/)",
+        config.jiraURL,
+      );
+      continue;
+    }
+    if (field === "jiraUsername") {
+      config.jiraUsername = askRequiredText(
+        "Enter Jira username",
+        config.jiraUsername,
+      );
+      continue;
+    }
+    if (field === "githubPAT") {
+      config.githubPAT = askRequiredSecret(
+        "Enter GitHub Personal Access Token",
+      );
+      continue;
+    }
+    if (field === "githubURL") {
+      config.githubURL = askRequiredText(
+        "Enter GitHub API URL (e.g., https://api.github.com)",
+        config.githubURL,
+      );
+      continue;
+    }
+    if (field === "githubUsername") {
+      config.githubUsername = askRequiredText(
+        "Enter GitHub username",
+        config.githubUsername,
+      );
+    }
+  }
 };
 
 export const runConfigWizard = async (
-  seed: Partial<Config>,
+  seed: Config,
 ): Promise<Config> => {
   console.log("\nIssue Fetcher Wizard");
-  console.log("Follow the prompts to configure a run.\n");
+  console.log(
+    "Configure this run. Missing provider credentials can be added now.\n",
+  );
 
   const provider = askChoice(
-    "Step 1/4 - Select provider",
+    "Step 1/6 - Select provider",
     PROVIDERS,
-    normalizeChoice(seed.provider, PROVIDERS) ?? "gitlab",
+    normalizeChoice(seed.provider, PROVIDERS) ?? "all",
   );
 
   const timeRange = askChoice(
-    "Step 2/4 - Select time range",
+    "Step 2/6 - Select time range",
     TIME_RANGES,
     normalizeChoice(seed.timeRange, TIME_RANGES) ?? "week",
   );
@@ -118,93 +224,76 @@ export const runConfigWizard = async (
   }
 
   const fetchMode = askChoice(
-    "Step 3/4 - Select fetch mode",
+    "Step 3/6 - Select fetch mode",
     FETCH_MODES,
     normalizeChoice(seed.fetchMode, FETCH_MODES) ?? "all_contributions",
   );
 
+  const reportProfile = askChoice(
+    "Step 4/6 - Select report profile",
+    REPORT_PROFILES,
+    seed.reportProfile ?? "activity_retro",
+  );
+  const reportFormat = askChoice(
+    "Step 5/6 - Select report format",
+    REPORT_FORMATS,
+    seed.reportFormat ?? "html",
+  );
+  const aiNarrative = askChoice(
+    "Step 6/6 - Select AI narrative mode",
+    AI_NARRATIVE_MODES,
+    seed.aiNarrative ?? "auto",
+  );
+
+  const aiModel = aiNarrative === "off"
+    ? seed.aiModel ?? "gpt-4o-mini"
+    : askRequiredText("AI model", seed.aiModel ?? "gpt-4o-mini");
+
   const outFile = provider === "all"
     ? `${OUTPUT_DIR}/issues.json`
     : askRequiredText(
-      "Step 4/4 - Output file name",
+      "Output file name",
       seed.outFile ?? getDefaultOutFile(provider),
     );
 
   const config: Config = {
+    ...seed,
     provider,
     outFile,
     timeRange,
     fetchMode,
     startDate,
     endDate,
-    gitlabPAT: seed.gitlabPAT,
-    gitlabURL: seed.gitlabURL,
-    gitlabUsername: seed.gitlabUsername,
-    jiraPAT: seed.jiraPAT,
-    jiraURL: seed.jiraURL,
-    jiraUsername: seed.jiraUsername,
-    githubPAT: seed.githubPAT,
-    githubURL: seed.githubURL,
-    githubUsername: seed.githubUsername,
-    reportProfile: seed.reportProfile ?? "activity_retro",
-    reportFormat: seed.reportFormat ?? "both",
-    aiNarrative: seed.aiNarrative ?? "auto",
-    aiModel: seed.aiModel ?? "gpt-4o-mini",
-    openaiApiKey: seed.openaiApiKey,
+    reportProfile: parseReportProfile(reportProfile) ?? "activity_retro",
+    reportFormat: parseReportFormat(reportFormat) ?? "html",
+    aiNarrative: parseAiNarrativeMode(aiNarrative) ?? "auto",
+    aiModel,
   };
 
-  if (providerSelected(provider, "gitlab")) {
-    config.gitlabPAT = askRequiredSecret(
-      "Enter GitLab Personal Access Token",
-      seed.gitlabPAT,
-    );
-    config.gitlabURL = askRequiredText(
-      "Enter GitLab URL (e.g., https://gitlab.com)",
-      seed.gitlabURL,
-    );
+  for (const line of formatProviderReadinessSummary(config)) {
+    console.log(line);
   }
 
-  if (providerSelected(provider, "jira")) {
-    config.jiraPAT = askRequiredSecret(
-      "Enter Jira Personal Access Token",
-      seed.jiraPAT,
+  const targetProviders = provider === "all"
+    ? (["gitlab", "jira", "github"] as ProviderName[])
+    : [provider];
+
+  for (const target of targetProviders) {
+    const missing = getMissingFieldsForProvider(config, target);
+    if (!missing.length) continue;
+
+    const shouldCapture = askBoolean(
+      `Add missing ${providerLabel(target)} credentials now?`,
+      true,
     );
-    config.jiraURL = askRequiredText(
-      "Enter Jira URL (e.g., https://jira.example.com/)",
-      seed.jiraURL,
-    );
-    config.jiraUsername = askRequiredText(
-      "Enter Jira username",
-      seed.jiraUsername,
-    );
+    if (shouldCapture) {
+      captureProviderCredentials(config, target);
+    }
   }
 
-  if (providerSelected(provider, "github")) {
-    config.githubPAT = askRequiredSecret(
-      "Enter GitHub Personal Access Token",
-      seed.githubPAT,
-    );
-    config.githubURL = askRequiredText(
-      "Enter GitHub API URL (e.g., https://api.github.com)",
-      seed.githubURL,
-    );
-    config.githubUsername = askRequiredText(
-      "Enter GitHub username",
-      seed.githubUsername,
-    );
+  for (const line of formatProviderReadinessSummary(config)) {
+    console.log(line);
   }
-
-  console.log("\nWizard Configuration:");
-  console.log(`- Provider: ${config.provider}`);
-  console.log(`- Time Range: ${config.timeRange}`);
-  console.log(`- Fetch Mode: ${config.fetchMode}`);
-  console.log(
-    `- Output: ${
-      config.provider === "all"
-        ? `${OUTPUT_DIR}/gitlab_issues.json, ${OUTPUT_DIR}/jira_issues.json, ${OUTPUT_DIR}/github_issues.json`
-        : config.outFile
-    }`,
-  );
 
   const confirmed = askBoolean("Start run with this configuration?", true);
   if (!confirmed) {

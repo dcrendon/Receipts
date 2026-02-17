@@ -1,18 +1,19 @@
-import { parseArgs } from "@std/cli";
-import { generateConfig, loadEnvConfig, promptExit } from "./config/config.ts";
 import {
-  parseAiNarrativeMode,
-  parseAttributionUsername,
-  parseReportFormat,
-  parseReportProfile,
-} from "./config/report_options.ts";
-import { printCommandHelp, resolveCommand } from "./core/cli.ts";
+  buildRuntimeConfig,
+  loadEnvConfig,
+  promptExit,
+} from "./config/config.ts";
+import { getDateRange, getPreviousDateRange } from "./config/dates.ts";
+import {
+  getProviderReadiness,
+  providerLabel as readinessProviderLabel,
+} from "./config/provider_readiness.ts";
+import { runConfigWizard } from "./config/tui.ts";
 import {
   evaluateRunStatus,
   EXIT_CODES,
   ProviderRunResult,
 } from "./core/run_status.ts";
-import { getDateRange, getPreviousDateRange } from "./config/dates.ts";
 import { getProviderAdapters } from "./providers/index.ts";
 import { providerLabel } from "./providers/provider_meta.ts";
 import { ProviderName } from "./providers/types.ts";
@@ -32,17 +33,52 @@ const ensureParentDir = async (path: string): Promise<void> => {
   }
 };
 
-const runFetch = async (args: string[], useTui: boolean) => {
-  const config = await generateConfig(useTui ? [...args, "--tui"] : args);
+const formatMissingProviders = (
+  missingByProvider: Partial<Record<ProviderName, (keyof Config)[]>>,
+): string => {
+  const chunks: string[] = [];
+  for (const provider of ["gitlab", "jira", "github"] as ProviderName[]) {
+    const missing = missingByProvider[provider] ?? [];
+    if (!missing.length) continue;
+    chunks.push(
+      `${readinessProviderLabel(provider)} missing ${missing.join(", ")}`,
+    );
+  }
+  return chunks.join("; ");
+};
+
+const runFetch = async (config: Config) => {
+  const readiness = getProviderReadiness(config);
+
+  const skippedProviders = readiness.selectedProviders.filter((provider) =>
+    !readiness.runnableProviders.includes(provider)
+  );
+  if (skippedProviders.length > 0) {
+    console.log("\nSkipping providers with incomplete credentials:");
+    for (const provider of skippedProviders) {
+      const missing = readiness.missingByProvider[provider] ?? [];
+      console.log(
+        `- ${readinessProviderLabel(provider)}: missing ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  if (readiness.runnableProviders.length === 0) {
+    promptExit(
+      `No provider credentials found for selected provider(s). ${
+        formatMissingProviders(readiness.missingByProvider)
+      }`,
+      1,
+    );
+  }
+
   const { startDate, endDate } = getDateRange(config);
   const previousWindow = getPreviousDateRange({ startDate, endDate });
   const runResults: ProviderRunResult[] = [];
   const successfulIssues: Partial<Record<ProviderName, unknown[]>> = {};
   const previousIssues: Partial<Record<ProviderName, unknown[]>> = {};
   const adapters = getProviderAdapters();
-  const requestedProviders = adapters
-    .filter((adapter) => adapter.canRun(config))
-    .map((adapter) => adapter.name);
+  const requestedProviders = readiness.runnableProviders;
 
   for (const adapter of adapters) {
     if (!adapter.canRun(config)) {
@@ -156,43 +192,30 @@ const runFetch = async (args: string[], useTui: boolean) => {
       : result.error ?? "unknown error";
     console.log(`- ${result.provider}: ${result.status} (${suffix})`);
   }
+
+  if (skippedProviders.length > 0) {
+    console.log("\nSkipped providers:");
+    for (const provider of skippedProviders) {
+      const missing = readiness.missingByProvider[provider] ?? [];
+      console.log(
+        `- ${provider}: missing ${missing.join(", ")}`,
+      );
+    }
+  }
+
   promptExit(
     `Process completed with status: ${runStatus}.`,
     EXIT_CODES[runStatus],
   );
 };
 
-const readIssuesFileIfPresent = async (
-  path: string,
-): Promise<unknown[] | undefined> => {
-  try {
-    const raw = await Deno.readTextFile(path);
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Report source must be an array: ${path}`);
-    }
-    return parsed;
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return undefined;
-    }
-    throw error;
+const main = async () => {
+  if (Deno.args.length > 0) {
+    console.log(
+      "Ignoring CLI args. This app now uses .env + TUI only.",
+    );
   }
-};
 
-const readIssuesFromCandidates = async (
-  paths: string[],
-): Promise<unknown[] | undefined> => {
-  for (const path of paths) {
-    const issues = await readIssuesFileIfPresent(path);
-    if (issues) {
-      return issues;
-    }
-  }
-  return undefined;
-};
-
-const runReportCommand = async (args: string[]) => {
   let envConfig: Partial<Config> = {};
   try {
     envConfig = await loadEnvConfig();
@@ -201,180 +224,16 @@ const runReportCommand = async (args: string[]) => {
     promptExit(message, 1);
   }
 
-  const parsed = parseArgs(args, {
-    string: [
-      "provider",
-      "gitlabFile",
-      "gitlabPrevFile",
-      "jiraFile",
-      "jiraPrevFile",
-      "githubFile",
-      "githubPrevFile",
-      "startDate",
-      "endDate",
-      "fetchMode",
-      "gitlabUsername",
-      "jiraUsername",
-      "githubUsername",
-      "reportProfile",
-      "reportFormat",
-      "aiNarrative",
-      "aiModel",
-    ],
-    alias: {
-      provider: "p",
-    },
+  const baseConfig = buildRuntimeConfig({
+    envConfig,
+    interactive: Deno.stdin.isTerminal(),
   });
 
-  const provider = (parsed.provider as Config["provider"] | undefined) ?? "all";
-  const gitlabFiles = parsed.gitlabFile
-    ? [parsed.gitlabFile]
-    : ["output/gitlab_issues.json", "gitlab_issues.json"];
-  const jiraFiles = parsed.jiraFile
-    ? [parsed.jiraFile]
-    : ["output/jira_issues.json", "jira_issues.json"];
-  const githubFiles = parsed.githubFile
-    ? [parsed.githubFile]
-    : ["output/github_issues.json", "github_issues.json"];
+  const config = Deno.stdin.isTerminal()
+    ? await runConfigWizard(baseConfig)
+    : baseConfig;
 
-  const gitlabPrevFiles = parsed.gitlabPrevFile
-    ? [parsed.gitlabPrevFile]
-    : ["output/gitlab_issues_prev.json", "gitlab_issues_prev.json"];
-  const jiraPrevFiles = parsed.jiraPrevFile
-    ? [parsed.jiraPrevFile]
-    : ["output/jira_issues_prev.json", "jira_issues_prev.json"];
-  const githubPrevFiles = parsed.githubPrevFile
-    ? [parsed.githubPrevFile]
-    : ["output/github_issues_prev.json", "github_issues_prev.json"];
-
-  const providerIssues: Partial<Record<ProviderName, unknown[]>> = {};
-  const previousProviderIssues: Partial<Record<ProviderName, unknown[]>> = {};
-
-  if (provider === "gitlab" || provider === "all") {
-    const issues = await readIssuesFromCandidates(gitlabFiles);
-    if (issues) providerIssues.gitlab = issues;
-    const prevIssues = await readIssuesFromCandidates(gitlabPrevFiles);
-    if (prevIssues) previousProviderIssues.gitlab = prevIssues;
-  }
-  if (provider === "jira" || provider === "all") {
-    const issues = await readIssuesFromCandidates(jiraFiles);
-    if (issues) providerIssues.jira = issues;
-    const prevIssues = await readIssuesFromCandidates(jiraPrevFiles);
-    if (prevIssues) previousProviderIssues.jira = prevIssues;
-  }
-  if (provider === "github" || provider === "all") {
-    const issues = await readIssuesFromCandidates(githubFiles);
-    if (issues) providerIssues.github = issues;
-    const prevIssues = await readIssuesFromCandidates(githubPrevFiles);
-    if (prevIssues) previousProviderIssues.github = prevIssues;
-  }
-
-  const loadedProviders = Object.keys(providerIssues);
-  if (!loadedProviders.length) {
-    promptExit(
-      "No provider issue files found. Run fetch first or pass --gitlabFile/--jiraFile/--githubFile.",
-      1,
-    );
-  }
-
-  let reportProfile: NonNullable<Config["reportProfile"]> = "activity_retro";
-  let reportFormat: NonNullable<Config["reportFormat"]> = "html";
-  let aiNarrative: NonNullable<Config["aiNarrative"]> = "auto";
-  let aiModel: string = "gpt-4o-mini";
-  let gitlabUsername: string | undefined;
-  let jiraUsername: string | undefined;
-  let githubUsername: string | undefined;
-
-  try {
-    reportProfile = parseReportProfile(
-      parsed.reportProfile ?? envConfig.reportProfile,
-    ) ?? "activity_retro";
-    reportFormat =
-      parseReportFormat(parsed.reportFormat ?? envConfig.reportFormat) ??
-        "html";
-    aiNarrative =
-      parseAiNarrativeMode(parsed.aiNarrative ?? envConfig.aiNarrative) ??
-        "auto";
-    aiModel = (parsed.aiModel ?? envConfig.aiModel ?? "gpt-4o-mini").trim();
-    gitlabUsername = parseAttributionUsername(
-      parsed.gitlabUsername ?? envConfig.gitlabUsername,
-    );
-    jiraUsername = parseAttributionUsername(
-      parsed.jiraUsername ?? envConfig.jiraUsername,
-    );
-    githubUsername = parseAttributionUsername(
-      parsed.githubUsername ?? envConfig.githubUsername,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    promptExit(message, 1);
-  }
-
-  const report = await buildRunReport(providerIssues, {
-    startDate: parsed.startDate ?? "unknown",
-    endDate: parsed.endDate ?? "unknown",
-    fetchMode: parsed.fetchMode ?? "all_contributions",
-    reportProfile,
-    reportFormat,
-    aiNarrative,
-    aiModel,
-    sourceMode: "report",
-    generatedAt: new Date().toISOString(),
-    openaiApiKey: envConfig.openaiApiKey,
-    usernames: {
-      gitlab: gitlabUsername,
-      jira: jiraUsername,
-      github: githubUsername,
-    },
-  }, {
-    previousProviderIssues,
-    diagnostics: {
-      sourceMode: "report",
-      requestedProviders: provider === "all"
-        ? ["gitlab", "jira", "github"]
-        : [provider],
-    },
-  });
-  const { markdownPath, htmlPath, normalizedPath } = await writeRunReport(
-    report,
-  );
-  if (markdownPath) {
-    console.log(`\nSummary report written to ${markdownPath}`);
-  }
-  if (htmlPath) {
-    console.log(`Summary HTML report written to ${htmlPath}`);
-  }
-  console.log(`Normalized issues written to ${normalizedPath}`);
-  promptExit("Report generation completed successfully.", 0);
-};
-
-const main = async () => {
-  const resolved = resolveCommand(Deno.args);
-
-  if (resolved.command === "help") {
-    printCommandHelp();
-    promptExit(null, 0);
-  }
-
-  if (resolved.command === "report") {
-    await runReportCommand(resolved.args);
-    return;
-  }
-
-  if (resolved.command === "tui") {
-    await runFetch(resolved.args, true);
-    return;
-  }
-
-  if (resolved.command === "legacy") {
-    console.log(
-      "\nWarning: legacy invocation detected. Prefer `fetch`, `tui`, or `report` subcommands.",
-    );
-    await runFetch(resolved.args, false);
-    return;
-  }
-
-  await runFetch(resolved.args, false);
+  await runFetch(config);
 };
 
 if (import.meta.main) {

@@ -1,6 +1,7 @@
 import { githubIssues } from "./github.ts";
 import { Config } from "../shared/types.ts";
 import { DateWindow, ProviderAdapter } from "./types.ts";
+import { isProviderRunnable } from "../config/provider_readiness.ts";
 
 type GitHubDeps = {
   fetchLive: typeof githubIssues;
@@ -17,7 +18,7 @@ export class GitHubAdapter implements ProviderAdapter {
   }
 
   canRun(config: Config): boolean {
-    return config.provider === "github" || config.provider === "all";
+    return isProviderRunnable(config, "github");
   }
 
   getOutFile(config: Config): string {
@@ -30,6 +31,10 @@ export class GitHubAdapter implements ProviderAdapter {
     config: Config,
     dateWindow: DateWindow,
   ): Promise<unknown[]> {
+    if (!config.githubPAT || !config.githubURL || !config.githubUsername) {
+      throw new Error("GitHub provider config is incomplete.");
+    }
+
     const headers = {
       "Authorization": `Bearer ${config.githubPAT}`,
       "Accept": "application/vnd.github+json",
@@ -37,9 +42,9 @@ export class GitHubAdapter implements ProviderAdapter {
     };
 
     return await this.#deps.fetchLive(
-      config.githubURL!,
+      config.githubURL,
       headers,
-      config.githubUsername!,
+      config.githubUsername,
       dateWindow.startDate,
       dateWindow.endDate,
       config.fetchMode,

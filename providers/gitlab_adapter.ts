@@ -1,6 +1,7 @@
 import { gitlabIssues } from "./gitlab.ts";
 import { Config } from "../shared/types.ts";
 import { DateWindow, ProviderAdapter } from "./types.ts";
+import { isProviderRunnable } from "../config/provider_readiness.ts";
 
 type GitLabDeps = {
   fetchLive: typeof gitlabIssues;
@@ -17,7 +18,7 @@ export class GitLabAdapter implements ProviderAdapter {
   }
 
   canRun(config: Config): boolean {
-    return config.provider === "gitlab" || config.provider === "all";
+    return isProviderRunnable(config, "gitlab");
   }
 
   getOutFile(config: Config): string {
@@ -30,12 +31,16 @@ export class GitLabAdapter implements ProviderAdapter {
     config: Config,
     dateWindow: DateWindow,
   ): Promise<unknown[]> {
+    if (!config.gitlabPAT || !config.gitlabURL) {
+      throw new Error("GitLab provider config is incomplete.");
+    }
+
     const headers = {
-      "PRIVATE-TOKEN": config.gitlabPAT!,
+      "PRIVATE-TOKEN": config.gitlabPAT,
     };
 
     return await this.#deps.fetchLive(
-      config.gitlabURL!,
+      config.gitlabURL,
       headers,
       dateWindow.startDate,
       dateWindow.endDate,

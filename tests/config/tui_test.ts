@@ -1,5 +1,22 @@
 import { assertEquals } from "@std/assert";
-import { getDefaultOutFile, normalizeChoice } from "../../config/tui.ts";
+import {
+  formatProviderReadinessSummary,
+  getDefaultOutFile,
+  normalizeChoice,
+} from "../../config/tui.ts";
+import { Config } from "../../shared/types.ts";
+
+const baseConfig = (overrides: Partial<Config> = {}): Config => ({
+  provider: "all",
+  outFile: "output/issues.json",
+  timeRange: "week",
+  fetchMode: "all_contributions",
+  reportProfile: "activity_retro",
+  reportFormat: "html",
+  aiNarrative: "auto",
+  aiModel: "gpt-4o-mini",
+  ...overrides,
+});
 
 Deno.test("getDefaultOutFile returns provider defaults", () => {
   assertEquals(getDefaultOutFile("gitlab"), "output/gitlab_issues.json");
@@ -13,4 +30,28 @@ Deno.test("normalizeChoice validates and normalizes input", () => {
   assertEquals(normalizeChoice("GitHub", allowed), "github");
   assertEquals(normalizeChoice(" jira ", allowed), "jira");
   assertEquals(normalizeChoice("invalid", allowed), undefined);
+});
+
+Deno.test("formatProviderReadinessSummary includes missing fields", () => {
+  const lines = formatProviderReadinessSummary(
+    baseConfig({
+      provider: "all",
+      gitlabPAT: "token",
+      gitlabURL: "https://gitlab.com",
+      jiraPAT: "token",
+      githubPAT: "token",
+      githubURL: "https://api.github.com",
+      githubUsername: "user",
+    }),
+  );
+
+  assertEquals(lines[0], "\nProvider readiness:");
+  assertEquals(lines.some((line) => line.includes("GitLab: ready")), true);
+  assertEquals(
+    lines.some((line) =>
+      line.includes("Jira: missing Jira URL, Jira username")
+    ),
+    true,
+  );
+  assertEquals(lines.some((line) => line.includes("GitHub: ready")), true);
 });
