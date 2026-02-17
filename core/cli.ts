@@ -40,7 +40,7 @@ Commands:
   report  Build report artifacts from existing provider JSON files
 
 Examples:
-  deno run main.ts fetch --provider all --mock
+  deno run main.ts fetch --provider all
   deno run main.ts tui
   deno run main.ts report --provider all --reportFormat both
 `);

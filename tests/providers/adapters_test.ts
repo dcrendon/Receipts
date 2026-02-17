@@ -10,7 +10,6 @@ const baseConfig = (overrides: Partial<Config> = {}): Config => {
     outFile: "issues.json",
     timeRange: "week",
     fetchMode: "all_contributions",
-    useMockData: false,
     ...overrides,
   };
 };
@@ -48,14 +47,9 @@ Deno.test("GitHubAdapter canRun/getOutFile follow provider selection", () => {
   );
 });
 
-Deno.test("GitLabAdapter uses mock loader when mock mode is enabled", async () => {
-  let usedMock = false;
+Deno.test("GitLabAdapter uses live fetch", async () => {
   let usedLive = false;
   const adapter = new GitLabAdapter({
-    loadMock: async () => {
-      usedMock = true;
-      return [{ id: "mock" }];
-    },
     fetchLive: async () => {
       usedLive = true;
       return [];
@@ -63,36 +57,33 @@ Deno.test("GitLabAdapter uses mock loader when mock mode is enabled", async () =
   });
 
   const data = await adapter.fetchIssues(
-    baseConfig({ provider: "gitlab", useMockData: true }),
+    baseConfig({
+      provider: "gitlab",
+      gitlabURL: "https://gitlab.com",
+      gitlabPAT: "token",
+    }),
     {
       startDate: "2026-02-01T00:00:00.000Z",
       endDate: "2026-02-16T23:59:59.999Z",
     },
   );
 
-  assertEquals(usedMock, true);
-  assertEquals(usedLive, false);
-  assertEquals(data.length, 1);
+  assertEquals(usedLive, true);
+  assertEquals(data.length, 0);
 });
 
-Deno.test("JiraAdapter uses live fetch when mock mode is disabled", async () => {
+Deno.test("JiraAdapter uses live fetch", async () => {
   let usedLive = false;
-  let usedMock = false;
   const adapter = new JiraAdapter({
-    loadMock: async () => {
-      usedMock = true;
-      return [];
-    },
     fetchLive: async () => {
       usedLive = true;
-      return [{ key: "LIVE-1" }];
+      return [];
     },
   });
 
   const data = await adapter.fetchIssues(
     baseConfig({
       provider: "jira",
-      useMockData: false,
       jiraURL: "https://jira.example.com",
       jiraPAT: "token",
       jiraUsername: "mock.user",
@@ -104,28 +95,21 @@ Deno.test("JiraAdapter uses live fetch when mock mode is disabled", async () => 
   );
 
   assertEquals(usedLive, true);
-  assertEquals(usedMock, false);
-  assertEquals(data.length, 1);
+  assertEquals(data.length, 0);
 });
 
-Deno.test("GitHubAdapter uses live fetch when mock mode is disabled", async () => {
+Deno.test("GitHubAdapter uses live fetch", async () => {
   let usedLive = false;
-  let usedMock = false;
   const adapter = new GitHubAdapter({
-    loadMock: async () => {
-      usedMock = true;
-      return [];
-    },
     fetchLive: async () => {
       usedLive = true;
-      return [{ number: 123 }];
+      return [];
     },
   });
 
   const data = await adapter.fetchIssues(
     baseConfig({
       provider: "github",
-      useMockData: false,
       githubURL: "https://api.github.com",
       githubPAT: "token",
       githubUsername: "mock.user",
@@ -137,6 +121,5 @@ Deno.test("GitHubAdapter uses live fetch when mock mode is disabled", async () =
   );
 
   assertEquals(usedLive, true);
-  assertEquals(usedMock, false);
-  assertEquals(data.length, 1);
+  assertEquals(data.length, 0);
 });

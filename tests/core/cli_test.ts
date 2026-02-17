@@ -9,7 +9,7 @@ Deno.test("resolveCommand resolves explicit subcommands", () => {
 });
 
 Deno.test("resolveCommand returns legacy for flag-only invocation", () => {
-  const resolved = resolveCommand(["--provider", "all", "--mock"]);
+  const resolved = resolveCommand(["--provider", "all"]);
   assertEquals(resolved.command, "legacy");
   assertEquals(resolved.args[0], "--provider");
 });

@@ -17,8 +17,6 @@ export interface Config {
   aiNarrative?: AiNarrativeMode;
   aiModel?: string;
   openaiApiKey?: string;
-  useMockData: boolean;
-  mockDataDir?: string;
   outFile: string;
   timeRange: string;
   fetchMode: string;

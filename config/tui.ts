@@ -63,16 +63,6 @@ const askRequiredText = (question: string, defaultValue?: string): string => {
   }
 };
 
-const askOptionalText = (
-  question: string,
-  defaultValue?: string,
-): string | undefined => {
-  const suffix = defaultValue ? ` (default: ${defaultValue})` : "";
-  const raw = prompt(`${question}${suffix}`);
-  const value = isNonEmpty(raw) ? raw.trim() : defaultValue?.trim();
-  return value && value.length > 0 ? value : undefined;
-};
-
 const askRequiredSecret = (question: string, defaultValue?: string): string => {
   const useDefault = Boolean(defaultValue) &&
     askBoolean(`${question}: keep existing value?`, true);
@@ -103,18 +93,13 @@ export const runConfigWizard = async (
   console.log("Follow the prompts to configure a run.\n");
 
   const provider = askChoice(
-    "Step 1/6 - Select provider",
+    "Step 1/4 - Select provider",
     PROVIDERS,
     normalizeChoice(seed.provider, PROVIDERS) ?? "gitlab",
   );
 
-  const useMockData = askBoolean(
-    "Step 2/6 - Use mock fixture data (no provider API calls)?",
-    seed.useMockData ?? false,
-  );
-
   const timeRange = askChoice(
-    "Step 3/6 - Select time range",
+    "Step 2/4 - Select time range",
     TIME_RANGES,
     normalizeChoice(seed.timeRange, TIME_RANGES) ?? "week",
   );
@@ -133,7 +118,7 @@ export const runConfigWizard = async (
   }
 
   const fetchMode = askChoice(
-    "Step 4/6 - Select fetch mode",
+    "Step 3/4 - Select fetch mode",
     FETCH_MODES,
     normalizeChoice(seed.fetchMode, FETCH_MODES) ?? "all_contributions",
   );
@@ -141,16 +126,9 @@ export const runConfigWizard = async (
   const outFile = provider === "all"
     ? `${OUTPUT_DIR}/issues.json`
     : askRequiredText(
-      "Step 5/6 - Output file name",
+      "Step 4/4 - Output file name",
       seed.outFile ?? getDefaultOutFile(provider),
     );
-
-  const mockDataDir = useMockData
-    ? askOptionalText(
-      "Step 6/6 - Mock fixture directory",
-      seed.mockDataDir ?? "fixtures",
-    )
-    : seed.mockDataDir;
 
   const config: Config = {
     provider,
@@ -159,8 +137,6 @@ export const runConfigWizard = async (
     fetchMode,
     startDate,
     endDate,
-    useMockData,
-    mockDataDir,
     gitlabPAT: seed.gitlabPAT,
     gitlabURL: seed.gitlabURL,
     gitlabUsername: seed.gitlabUsername,
@@ -177,54 +153,51 @@ export const runConfigWizard = async (
     openaiApiKey: seed.openaiApiKey,
   };
 
-  if (!useMockData) {
-    if (providerSelected(provider, "gitlab")) {
-      config.gitlabPAT = askRequiredSecret(
-        "Enter GitLab Personal Access Token",
-        seed.gitlabPAT,
-      );
-      config.gitlabURL = askRequiredText(
-        "Enter GitLab URL (e.g., https://gitlab.com)",
-        seed.gitlabURL,
-      );
-    }
+  if (providerSelected(provider, "gitlab")) {
+    config.gitlabPAT = askRequiredSecret(
+      "Enter GitLab Personal Access Token",
+      seed.gitlabPAT,
+    );
+    config.gitlabURL = askRequiredText(
+      "Enter GitLab URL (e.g., https://gitlab.com)",
+      seed.gitlabURL,
+    );
+  }
 
-    if (providerSelected(provider, "jira")) {
-      config.jiraPAT = askRequiredSecret(
-        "Enter Jira Personal Access Token",
-        seed.jiraPAT,
-      );
-      config.jiraURL = askRequiredText(
-        "Enter Jira URL (e.g., https://jira.example.com/)",
-        seed.jiraURL,
-      );
-      config.jiraUsername = askRequiredText(
-        "Enter Jira username",
-        seed.jiraUsername,
-      );
-    }
+  if (providerSelected(provider, "jira")) {
+    config.jiraPAT = askRequiredSecret(
+      "Enter Jira Personal Access Token",
+      seed.jiraPAT,
+    );
+    config.jiraURL = askRequiredText(
+      "Enter Jira URL (e.g., https://jira.example.com/)",
+      seed.jiraURL,
+    );
+    config.jiraUsername = askRequiredText(
+      "Enter Jira username",
+      seed.jiraUsername,
+    );
+  }
 
-    if (providerSelected(provider, "github")) {
-      config.githubPAT = askRequiredSecret(
-        "Enter GitHub Personal Access Token",
-        seed.githubPAT,
-      );
-      config.githubURL = askRequiredText(
-        "Enter GitHub API URL (e.g., https://api.github.com)",
-        seed.githubURL,
-      );
-      config.githubUsername = askRequiredText(
-        "Enter GitHub username",
-        seed.githubUsername,
-      );
-    }
+  if (providerSelected(provider, "github")) {
+    config.githubPAT = askRequiredSecret(
+      "Enter GitHub Personal Access Token",
+      seed.githubPAT,
+    );
+    config.githubURL = askRequiredText(
+      "Enter GitHub API URL (e.g., https://api.github.com)",
+      seed.githubURL,
+    );
+    config.githubUsername = askRequiredText(
+      "Enter GitHub username",
+      seed.githubUsername,
+    );
   }
 
   console.log("\nWizard Configuration:");
   console.log(`- Provider: ${config.provider}`);
   console.log(`- Time Range: ${config.timeRange}`);
   console.log(`- Fetch Mode: ${config.fetchMode}`);
-  console.log(`- Mock Data: ${config.useMockData ? "enabled" : "disabled"}`);
   console.log(
     `- Output: ${
       config.provider === "all"

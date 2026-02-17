@@ -1,11 +1,9 @@
 import { githubIssues } from "./github.ts";
-import { loadMockIssues } from "./mocks.ts";
 import { Config } from "../shared/types.ts";
 import { DateWindow, ProviderAdapter } from "./types.ts";
 
 type GitHubDeps = {
   fetchLive: typeof githubIssues;
-  loadMock: typeof loadMockIssues;
 };
 
 export class GitHubAdapter implements ProviderAdapter {
@@ -15,7 +13,6 @@ export class GitHubAdapter implements ProviderAdapter {
   constructor(deps?: Partial<GitHubDeps>) {
     this.#deps = {
       fetchLive: deps?.fetchLive ?? githubIssues,
-      loadMock: deps?.loadMock ?? loadMockIssues,
     };
   }
 
@@ -33,11 +30,6 @@ export class GitHubAdapter implements ProviderAdapter {
     config: Config,
     dateWindow: DateWindow,
   ): Promise<unknown[]> {
-    if (config.useMockData) {
-      console.log("\nUsing GitHub mock fixture data.");
-      return await this.#deps.loadMock("github", config.mockDataDir);
-    }
-
     const headers = {
       "Authorization": `Bearer ${config.githubPAT}`,
       "Accept": "application/vnd.github+json",

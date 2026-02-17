@@ -49,7 +49,7 @@ deno run main.ts
 
 ```bash
 # fetch issues (recommended v2 command surface)
-deno run main.ts fetch --provider all --mock
+deno run main.ts fetch --provider all
 
 # launch wizard-style TUI flow
 deno run main.ts tui
@@ -66,13 +66,10 @@ deno task fmt
 # run tests
 deno task test
 # or, with raw deno permissions:
-deno test --allow-read=fixtures,reporting/shadcn-renderer --allow-run=npm
+deno test --allow-read=reporting/shadcn-renderer --allow-run=npm
 
 # command help
 deno run main.ts help
-
-# offline run with local fixtures (no provider credentials required)
-deno run --allow-read --allow-env --allow-run=npm main.ts fetch --provider all --mock
 ```
 
 ### Expected Outputs
@@ -115,7 +112,7 @@ Minimum validation before merge:
 
 - `deno task fmt`
 - `deno task test` (or
-  `deno test --allow-read=fixtures,reporting/shadcn-renderer --allow-run=npm`)
+  `deno test --allow-read=reporting/shadcn-renderer --allow-run=npm`)
 - `deno run main.ts --help`
 - representative provider run when behavior changes
 
@@ -139,9 +136,7 @@ Run directly in CLI:
 deno run main.ts fetch
 ```
 
-If `.env` and flags are missing, the tool prompts for required values. When
-`--mock`/`--useMockData` is enabled, provider API calls are skipped and fixture
-files are used instead.
+If `.env` and flags are missing, the tool prompts for required values.
 
 ### Command Surface (v2)
 
@@ -155,7 +150,7 @@ Legacy flag-only invocation still works, but prints a deprecation warning.
 
 Run with `tui` to use a guided flow that:
 
-1. selects provider and mock/live mode,
+1. selects provider,
 2. configures time range and fetch mode,
 3. validates required auth/URL fields for selected providers,
 4. confirms configuration before starting.
@@ -166,31 +161,29 @@ This is recommended for first-time runs and manual local use.
 
 You can override defaults or environment variables using flags:
 
-| Flag               | Alias     | Description                                                                                            | Default                      |
-| :----------------- | :-------- | :----------------------------------------------------------------------------------------------------- | :--------------------------- |
-| `--provider`       |           | Provider to use (`gitlab`, `jira`, `github`, `all`)                                                    | `gitlab`                     |
-| `--gitlabPAT`      | `--pat`   | GitLab Personal Access Token                                                                           | _Interactive_                |
-| `--gitlabURL`      | `--url`   | GitLab instance URL                                                                                    | _Interactive_                |
-| `--jiraPAT`        |           | Jira Personal Access Token                                                                             | _Interactive_                |
-| `--jiraURL`        |           | Jira instance URL                                                                                      | _Interactive_                |
-| `--jiraUsername`   |           | Jira username (for JQL queries)                                                                        | _Interactive_                |
-| `--githubPAT`      |           | GitHub Personal Access Token                                                                           | _Interactive_                |
-| `--githubURL`      |           | GitHub API URL (for Cloud or Enterprise)                                                               | _Interactive_                |
-| `--githubUsername` |           | GitHub username                                                                                        | _Interactive_                |
-| `--reportProfile`  |           | Report profile: `brief`, `activity_retro`, `showcase` (hard reject: `manager_retro`)                   | `activity_retro`             |
-| `--reportFormat`   |           | Report format preference (`markdown`, `html`, `both` accepted; HTML artifact is always generated)      | `html`                       |
-| `--aiNarrative`    |           | AI rewrite mode: `auto`, `on`, `off`                                                                   | `auto`                       |
-| `--aiModel`        |           | OpenAI model for narrative rewrite                                                                     | `gpt-4o-mini`                |
-| `--gitlabUsername` |           | GitLab username for deterministic attribution/scoring                                                  | `GITLAB_USERNAME` or empty   |
-| `--outFile`        | `--out`   | Output filename                                                                                        | `output/gitlab_issues.json`* |
-| `--timeRange`      | `--range` | `week`, `month`, `year`, `custom`                                                                      | `week`                       |
-| `--startDate`      | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom`                                                | N/A                          |
-| `--endDate`        | `--end`   | Custom end date (`MM-DD-YYYY`), required for `custom`                                                  | N/A                          |
-| `--fetchMode`      | `--mode`  | `my_issues`, `all_contributions`                                                                       | `all_contributions`          |
-| `--useMockData`    | `--mock`  | Use local fixture files instead of provider APIs                                                       | `false`                      |
-| `--mockDataDir`    |           | Fixture directory path (`gitlab_issues.mock.json`, `jira_issues.mock.json`, `github_issues.mock.json`) | `fixtures`                   |
-| `--help`           | `-h`      | Show flag help message                                                                                 | N/A                          |
-| `--tui`            |           | Launch wizard-style interactive configuration flow (also available via `tui` command)                  | `false`                      |
+| Flag               | Alias     | Description                                                                                       | Default                      |
+| :----------------- | :-------- | :------------------------------------------------------------------------------------------------ | :--------------------------- |
+| `--provider`       |           | Provider to use (`gitlab`, `jira`, `github`, `all`)                                               | `gitlab`                     |
+| `--gitlabPAT`      | `--pat`   | GitLab Personal Access Token                                                                      | _Interactive_                |
+| `--gitlabURL`      | `--url`   | GitLab instance URL                                                                               | _Interactive_                |
+| `--jiraPAT`        |           | Jira Personal Access Token                                                                        | _Interactive_                |
+| `--jiraURL`        |           | Jira instance URL                                                                                 | _Interactive_                |
+| `--jiraUsername`   |           | Jira username (for JQL queries)                                                                   | _Interactive_                |
+| `--githubPAT`      |           | GitHub Personal Access Token                                                                      | _Interactive_                |
+| `--githubURL`      |           | GitHub API URL (for Cloud or Enterprise)                                                          | _Interactive_                |
+| `--githubUsername` |           | GitHub username                                                                                   | _Interactive_                |
+| `--reportProfile`  |           | Report profile: `brief`, `activity_retro`, `showcase` (hard reject: `manager_retro`)              | `activity_retro`             |
+| `--reportFormat`   |           | Report format preference (`markdown`, `html`, `both` accepted; HTML artifact is always generated) | `html`                       |
+| `--aiNarrative`    |           | AI rewrite mode: `auto`, `on`, `off`                                                              | `auto`                       |
+| `--aiModel`        |           | OpenAI model for narrative rewrite                                                                | `gpt-4o-mini`                |
+| `--gitlabUsername` |           | GitLab username for deterministic attribution/scoring                                             | `GITLAB_USERNAME` or empty   |
+| `--outFile`        | `--out`   | Output filename                                                                                   | `output/gitlab_issues.json`* |
+| `--timeRange`      | `--range` | `week`, `month`, `year`, `custom`                                                                 | `week`                       |
+| `--startDate`      | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom`                                           | N/A                          |
+| `--endDate`        | `--end`   | Custom end date (`MM-DD-YYYY`), required for `custom`                                             | N/A                          |
+| `--fetchMode`      | `--mode`  | `my_issues`, `all_contributions`                                                                  | `all_contributions`          |
+| `--help`           | `-h`      | Show flag help message                                                                            | N/A                          |
+| `--tui`            |           | Launch wizard-style interactive configuration flow (also available via `tui` command)             | `false`                      |
 
 \* Default output filename depends on provider. With `--provider all`, the tool
 writes `output/gitlab_issues.json`, `output/jira_issues.json`, and
@@ -210,9 +203,6 @@ deno run main.ts fetch --provider all --range week
 
 # GitHub
 deno run main.ts fetch --provider github --githubURL https://api.github.com --githubUsername myuser --range week
-
-# Offline local run (uses fixtures/*.mock.json)
-deno run --allow-read --allow-env --allow-run=npm main.ts fetch --provider all --mock
 
 # Generate report only (from existing issue json files)
 deno run main.ts report --provider all

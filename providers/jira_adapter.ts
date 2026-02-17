@@ -1,11 +1,9 @@
 import { jiraIssues } from "./jira.ts";
-import { loadMockIssues } from "./mocks.ts";
 import { Config } from "../shared/types.ts";
 import { DateWindow, ProviderAdapter } from "./types.ts";
 
 type JiraDeps = {
   fetchLive: typeof jiraIssues;
-  loadMock: typeof loadMockIssues;
 };
 
 export class JiraAdapter implements ProviderAdapter {
@@ -15,7 +13,6 @@ export class JiraAdapter implements ProviderAdapter {
   constructor(deps?: Partial<JiraDeps>) {
     this.#deps = {
       fetchLive: deps?.fetchLive ?? jiraIssues,
-      loadMock: deps?.loadMock ?? loadMockIssues,
     };
   }
 
@@ -33,11 +30,6 @@ export class JiraAdapter implements ProviderAdapter {
     config: Config,
     dateWindow: DateWindow,
   ): Promise<unknown[]> {
-    if (config.useMockData) {
-      console.log("\nUsing Jira mock fixture data.");
-      return await this.#deps.loadMock("jira", config.mockDataDir);
-    }
-
     const headers = {
       "Authorization": `Bearer ${config.jiraPAT}`,
       "Content-Type": "application/json",

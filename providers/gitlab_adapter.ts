@@ -1,11 +1,9 @@
 import { gitlabIssues } from "./gitlab.ts";
-import { loadMockIssues } from "./mocks.ts";
 import { Config } from "../shared/types.ts";
 import { DateWindow, ProviderAdapter } from "./types.ts";
 
 type GitLabDeps = {
   fetchLive: typeof gitlabIssues;
-  loadMock: typeof loadMockIssues;
 };
 
 export class GitLabAdapter implements ProviderAdapter {
@@ -15,7 +13,6 @@ export class GitLabAdapter implements ProviderAdapter {
   constructor(deps?: Partial<GitLabDeps>) {
     this.#deps = {
       fetchLive: deps?.fetchLive ?? gitlabIssues,
-      loadMock: deps?.loadMock ?? loadMockIssues,
     };
   }
 
@@ -33,11 +30,6 @@ export class GitLabAdapter implements ProviderAdapter {
     config: Config,
     dateWindow: DateWindow,
   ): Promise<unknown[]> {
-    if (config.useMockData) {
-      console.log("\nUsing GitLab mock fixture data.");
-      return await this.#deps.loadMock("gitlab", config.mockDataDir);
-    }
-
     const headers = {
       "PRIVATE-TOKEN": config.gitlabPAT!,
     };

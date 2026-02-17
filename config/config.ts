@@ -19,18 +19,6 @@ export const promptExit = (message: string | null, exitCode: number): never => {
   Deno.exit(exitCode);
 };
 
-const parseBoolean = (value?: string): boolean | undefined => {
-  if (!value) return undefined;
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-  return undefined;
-};
-
 export const loadEnvConfig = async (): Promise<Partial<Config>> => {
   await load({ export: true });
   const gitlabPAT = Deno.env.get("GITLAB_PAT");
@@ -58,8 +46,6 @@ export const loadEnvConfig = async (): Promise<Partial<Config>> => {
     | "github"
     | "all"
     | undefined;
-  const useMockData = parseBoolean(Deno.env.get("USE_MOCK_DATA") ?? undefined);
-  const mockDataDir = Deno.env.get("MOCK_DATA_DIR");
   // const projectIDs = Deno.env.get("PROJECT_IDS")?.split(",");
   const envParams: Partial<Config> = {
     gitlabPAT,
@@ -74,8 +60,6 @@ export const loadEnvConfig = async (): Promise<Partial<Config>> => {
     startDate,
     endDate,
     provider,
-    useMockData,
-    mockDataDir,
     gitlabUsername: parseAttributionUsername(gitlabUsername),
     jiraUsername: parseAttributionUsername(jiraUsername),
     githubUsername: parseAttributionUsername(githubUsername),
@@ -145,14 +129,6 @@ const printHelp = () => {
           alias: -h
       --tui
           Launch interactive wizard-style TUI flow
-      --useMockData
-          Use local fixture files instead of provider APIs
-          Alias: --mock
-          Env: USE_MOCK_DATA=true
-      --mockDataDir
-          Directory containing mock fixture files
-          Default: fixtures
-          Env: MOCK_DATA_DIR
       --reportProfile
           Report profile
           Default: activity_retro
@@ -208,13 +184,11 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
       "startDate",
       "endDate",
       "provider",
-      "mockDataDir",
     ],
     // collect: ["projectIDs"],
-    boolean: ["help", "useMockData", "tui"],
+    boolean: ["help", "tui"],
     alias: {
       help: "h",
-      useMockData: "mock",
       gitlabPAT: "pat",
       gitlabURL: "url",
       outFile: "out",
@@ -229,10 +203,6 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
   if (args.help) {
     printHelp();
   }
-  const hasUseMockDataArg = Object.prototype.hasOwnProperty.call(
-    args,
-    "useMockData",
-  );
 
   let combinedConfig: Partial<Config> = {};
   try {
@@ -271,10 +241,6 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
       fetchMode: args.fetchMode ?? envConfig.fetchMode ?? "all_contributions",
       startDate: args.startDate ?? envConfig.startDate,
       endDate: args.endDate ?? envConfig.endDate,
-      useMockData: hasUseMockDataArg
-        ? Boolean(args.useMockData)
-        : envConfig.useMockData ?? false,
-      mockDataDir: args.mockDataDir ?? envConfig.mockDataDir,
       // projectIDs: (args.projectIDs as string[]) ?? envConfig.projectIDs,
     };
   } catch (error) {
@@ -294,7 +260,6 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
 
   // Validate GitLab Config
   if (
-    !combinedConfig.useMockData &&
     (combinedConfig.provider === "gitlab" || combinedConfig.provider === "all")
   ) {
     if (!combinedConfig.gitlabPAT) {
@@ -323,7 +288,6 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
 
   // Validate Jira Config
   if (
-    !combinedConfig.useMockData &&
     (combinedConfig.provider === "jira" || combinedConfig.provider === "all")
   ) {
     if (!combinedConfig.jiraPAT) {
@@ -362,7 +326,6 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
 
   // Validate GitHub Config
   if (
-    !combinedConfig.useMockData &&
     (combinedConfig.provider === "github" || combinedConfig.provider === "all")
   ) {
     if (!combinedConfig.githubPAT) {
@@ -419,9 +382,7 @@ Configuration:
   - Report Profile: ${finalConfig.reportProfile}
   - Report Format: ${finalConfig.reportFormat}
   - AI Narrative: ${finalConfig.aiNarrative}
-  - AI Model: ${finalConfig.aiModel}
-  - Mock Data: ${finalConfig.useMockData ? "enabled" : "disabled"}
-  - Mock Dir: ${finalConfig.mockDataDir ?? "fixtures"}`);
+  - AI Model: ${finalConfig.aiModel}`);
 
   return finalConfig;
 };
