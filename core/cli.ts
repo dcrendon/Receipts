@@ -43,5 +43,6 @@ Examples:
   deno run main.ts fetch --provider all
   deno run main.ts tui
   deno run main.ts report --provider all --reportFormat both
+  deno run main.ts report --provider all --gitlabPrevFile output/gitlab_issues_prev.json
 `);
 };

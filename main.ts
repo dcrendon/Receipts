@@ -12,7 +12,7 @@ import {
   EXIT_CODES,
   ProviderRunResult,
 } from "./core/run_status.ts";
-import { getDateRange } from "./config/dates.ts";
+import { getDateRange, getPreviousDateRange } from "./config/dates.ts";
 import { getProviderAdapters } from "./providers/index.ts";
 import { providerLabel } from "./providers/provider_meta.ts";
 import { ProviderName } from "./providers/types.ts";
@@ -35,9 +35,14 @@ const ensureParentDir = async (path: string): Promise<void> => {
 const runFetch = async (args: string[], useTui: boolean) => {
   const config = await generateConfig(useTui ? [...args, "--tui"] : args);
   const { startDate, endDate } = getDateRange(config);
+  const previousWindow = getPreviousDateRange({ startDate, endDate });
   const runResults: ProviderRunResult[] = [];
   const successfulIssues: Partial<Record<ProviderName, unknown[]>> = {};
+  const previousIssues: Partial<Record<ProviderName, unknown[]>> = {};
   const adapters = getProviderAdapters();
+  const requestedProviders = adapters
+    .filter((adapter) => adapter.canRun(config))
+    .map((adapter) => adapter.name);
 
   for (const adapter of adapters) {
     if (!adapter.canRun(config)) {
@@ -68,6 +73,20 @@ const runFetch = async (args: string[], useTui: boolean) => {
         issueCount: issues.length,
       });
       successfulIssues[adapter.name] = issues;
+
+      try {
+        previousIssues[adapter.name] = await adapter.fetchIssues(config, {
+          startDate: previousWindow.startDate,
+          endDate: previousWindow.endDate,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error
+          ? error.message
+          : String(error);
+        console.error(
+          `\n${providerTitle} previous-window fetch failed: ${errorMessage}`,
+        );
+      }
     } catch (error) {
       const errorMessage = error instanceof Error
         ? error.message
@@ -98,11 +117,20 @@ const runFetch = async (args: string[], useTui: boolean) => {
         reportFormat: config.reportFormat ?? "html",
         aiNarrative: config.aiNarrative ?? "auto",
         aiModel: config.aiModel ?? "gpt-4o-mini",
+        sourceMode: "fetch",
+        generatedAt: new Date().toISOString(),
         openaiApiKey: config.openaiApiKey,
         usernames: {
           gitlab: config.gitlabUsername,
           jira: config.jiraUsername,
           github: config.githubUsername,
+        },
+      }, {
+        previousProviderIssues: previousIssues,
+        diagnostics: {
+          sourceMode: "fetch",
+          requestedProviders,
+          runResults,
         },
       });
       const { markdownPath, htmlPath, normalizedPath } = await writeRunReport(
@@ -177,8 +205,11 @@ const runReportCommand = async (args: string[]) => {
     string: [
       "provider",
       "gitlabFile",
+      "gitlabPrevFile",
       "jiraFile",
+      "jiraPrevFile",
       "githubFile",
+      "githubPrevFile",
       "startDate",
       "endDate",
       "fetchMode",
@@ -206,19 +237,36 @@ const runReportCommand = async (args: string[]) => {
     ? [parsed.githubFile]
     : ["output/github_issues.json", "github_issues.json"];
 
+  const gitlabPrevFiles = parsed.gitlabPrevFile
+    ? [parsed.gitlabPrevFile]
+    : ["output/gitlab_issues_prev.json", "gitlab_issues_prev.json"];
+  const jiraPrevFiles = parsed.jiraPrevFile
+    ? [parsed.jiraPrevFile]
+    : ["output/jira_issues_prev.json", "jira_issues_prev.json"];
+  const githubPrevFiles = parsed.githubPrevFile
+    ? [parsed.githubPrevFile]
+    : ["output/github_issues_prev.json", "github_issues_prev.json"];
+
   const providerIssues: Partial<Record<ProviderName, unknown[]>> = {};
+  const previousProviderIssues: Partial<Record<ProviderName, unknown[]>> = {};
 
   if (provider === "gitlab" || provider === "all") {
     const issues = await readIssuesFromCandidates(gitlabFiles);
     if (issues) providerIssues.gitlab = issues;
+    const prevIssues = await readIssuesFromCandidates(gitlabPrevFiles);
+    if (prevIssues) previousProviderIssues.gitlab = prevIssues;
   }
   if (provider === "jira" || provider === "all") {
     const issues = await readIssuesFromCandidates(jiraFiles);
     if (issues) providerIssues.jira = issues;
+    const prevIssues = await readIssuesFromCandidates(jiraPrevFiles);
+    if (prevIssues) previousProviderIssues.jira = prevIssues;
   }
   if (provider === "github" || provider === "all") {
     const issues = await readIssuesFromCandidates(githubFiles);
     if (issues) providerIssues.github = issues;
+    const prevIssues = await readIssuesFromCandidates(githubPrevFiles);
+    if (prevIssues) previousProviderIssues.github = prevIssues;
   }
 
   const loadedProviders = Object.keys(providerIssues);
@@ -270,11 +318,21 @@ const runReportCommand = async (args: string[]) => {
     reportFormat,
     aiNarrative,
     aiModel,
+    sourceMode: "report",
+    generatedAt: new Date().toISOString(),
     openaiApiKey: envConfig.openaiApiKey,
     usernames: {
       gitlab: gitlabUsername,
       jira: jiraUsername,
       github: githubUsername,
+    },
+  }, {
+    previousProviderIssues,
+    diagnostics: {
+      sourceMode: "report",
+      requestedProviders: provider === "all"
+        ? ["gitlab", "jira", "github"]
+        : [provider],
     },
   });
   const { markdownPath, htmlPath, normalizedPath } = await writeRunReport(

@@ -186,19 +186,84 @@ Deno.test("buildRunReport applies deterministic impact scoring, ordering, and se
   assertStringIncludes(report.markdown, "## Risks and Follow-ups");
   assertStringIncludes(report.markdown, "## Weekly Activity Talking Points");
   assertStringIncludes(report.markdown, "## Appendix");
+  assertStringIncludes(report.markdown, "## Comparison");
+  assertStringIncludes(report.markdown, "## Coverage");
 
-  assertStringIncludes(report.html, "https://cdn.tailwindcss.com");
-  assertStringIncludes(report.html, "Top Activity Highlights");
-  assertStringIncludes(report.html, "Collaboration Highlights");
+  assertStringIncludes(report.html, "Activity Report");
+  assertStringIncludes(report.html, "Top Highlights");
+  assertStringIncludes(report.html, "Collaboration");
   assertStringIncludes(report.html, "Risks and Follow-ups");
-  assertStringIncludes(report.html, "Weekly Activity Talking Points");
+  assertStringIncludes(report.html, "Talking Points");
   assertStringIncludes(report.html, "Appendix");
-  assertStringIncludes(report.html, "Summary");
-  assertStringIncludes(report.html, "Score inputs:");
+  assertStringIncludes(report.html, "Export CSV");
+  assertStringIncludes(report.html, "How scoring works");
   assertStringIncludes(report.html, "completed +40");
   assertEquals(
     report.html.includes("Score inputs: completed +40, active +20"),
     false,
   );
-  assertEquals(report.html.includes("shadcn/ui package renderer"), false);
+  assertEquals(report.comparison.available, false);
+  assertEquals(report.coverage.sourceMode, "report");
+  assertEquals(report.coverage.totalProviderCount, 3);
+});
+
+Deno.test("buildRunReport computes comparison deltas when previous issues are provided", async () => {
+  const report = await buildRunReport(
+    {
+      github: [{
+        id: 10,
+        number: 10,
+        title: "Current issue",
+        state: "closed",
+        created_at: "2026-02-10T00:00:00Z",
+        updated_at: "2026-02-16T22:30:00Z",
+        user: { login: "mock.user" },
+        assignees: [{ login: "mock.user" }],
+        labels: [{ name: "p1" }],
+        comments: 4,
+        notes: [{ id: 1, user: { login: "mock.user" } }],
+      }],
+    },
+    {
+      startDate: "2026-02-10T00:00:00Z",
+      endDate: "2026-02-16T23:59:59Z",
+      fetchMode: "all_contributions",
+      reportProfile: "activity_retro",
+      reportFormat: "both",
+      aiNarrative: "off",
+      aiModel: "gpt-4o-mini",
+      sourceMode: "fetch",
+      usernames: { github: "mock.user" },
+    },
+    {
+      previousProviderIssues: {
+        github: [{
+          id: 11,
+          number: 11,
+          title: "Previous issue",
+          state: "open",
+          created_at: "2026-02-03T00:00:00Z",
+          updated_at: "2026-02-09T22:30:00Z",
+          user: { login: "teammate" },
+          assignees: [{ login: "teammate" }],
+          labels: [{ name: "maintenance" }],
+          comments: 0,
+          notes: [],
+        }],
+      },
+      diagnostics: {
+        sourceMode: "fetch",
+        requestedProviders: ["github"],
+        runResults: [{ provider: "github", status: "success", issueCount: 1 }],
+      },
+    },
+  );
+
+  assertEquals(report.comparison.available, true);
+  assertEquals(report.comparison.completed?.current, 1);
+  assertEquals(report.comparison.completed?.previous, 0);
+  assertEquals(report.comparison.active?.current, 0);
+  assertEquals(report.comparison.active?.previous, 1);
+  assertEquals(report.coverage.connectedProviderCount, 1);
+  assertEquals(report.coverage.partialFailures, 0);
 });

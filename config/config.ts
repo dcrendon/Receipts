@@ -124,6 +124,15 @@ const printHelp = () => {
       --endDate,
           Custom end date (Format: MM-DD-YYYY)
           Alias: --end
+      --gitlabPrevFile
+          Optional previous-window GitLab JSON file for report deltas
+          Report command only
+      --jiraPrevFile
+          Optional previous-window Jira JSON file for report deltas
+          Report command only
+      --githubPrevFile
+          Optional previous-window GitHub JSON file for report deltas
+          Report command only
       --help,
           Show this help message.
           alias: -h
@@ -148,6 +157,9 @@ const printHelp = () => {
           OpenAI model for AI narrative rewrite
           Default: gpt-4o-mini
           Env: AI_MODEL
+      HTML profile selector
+          Presentation-only density toggle in generated report
+          (does not re-fetch/re-score data)
       OPENAI_API_KEY
           Required when --aiNarrative on
   `);
