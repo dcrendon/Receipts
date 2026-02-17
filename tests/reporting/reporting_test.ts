@@ -193,4 +193,12 @@ Deno.test("buildRunReport applies deterministic impact scoring, ordering, and se
   assertStringIncludes(report.html, "Risks and Follow-ups");
   assertStringIncludes(report.html, "Weekly Activity Talking Points");
   assertStringIncludes(report.html, "Appendix");
+  assertStringIncludes(report.html, "Summary");
+  assertStringIncludes(report.html, "Score inputs:");
+  assertStringIncludes(report.html, "completed +40");
+  assertEquals(
+    report.html.includes("Score inputs: completed +40, active +20"),
+    false,
+  );
+  assertEquals(report.html.includes("shadcn/ui package renderer"), false);
 });

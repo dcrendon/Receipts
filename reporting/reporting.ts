@@ -2237,12 +2237,29 @@ const pathExists = async (path: string): Promise<boolean> => {
     await Deno.stat(path);
     return true;
   } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return false;
+    }
+    throw error;
+  }
+};
+
+const assertPathReadable = async (
+  path: string,
+  missingMessage: string,
+  unreadableMessage: string,
+): Promise<void> => {
+  try {
+    await Deno.stat(path);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      throw new Error(missingMessage);
+    }
     if (
-      error instanceof Deno.errors.NotFound ||
       error instanceof Deno.errors.PermissionDenied ||
       (error instanceof Error && error.name === "NotCapable")
     ) {
-      return false;
+      throw new Error(unreadableMessage);
     }
     throw error;
   }
@@ -2274,17 +2291,19 @@ const runNpmInRenderer = async (
   );
 };
 
-const ensureShadcnPackageRendererReady = async (): Promise<boolean> => {
-  if (!(await pathExists(`${SHADCN_RENDERER_DIR}/package.json`))) {
-    return false;
-  }
+const ensureShadcnPackageRendererReady = async (): Promise<void> => {
+  await assertPathReadable(
+    `${SHADCN_RENDERER_DIR}/package.json`,
+    "Shadcn renderer workspace is missing. Expected reporting/shadcn-renderer/package.json.",
+    "Shadcn renderer workspace is unreadable. Re-run with `--allow-read=reporting/shadcn-renderer` or `--allow-read`.",
+  );
   if (!(await canExecuteCommand("npm"))) {
     throw new Error(
       "Shadcn renderer requires npm run permission. Re-run with `--allow-run=npm` or `-A`.",
     );
   }
   if (shadcnRendererReady) {
-    return true;
+    return;
   }
 
   if (!(await pathExists(`${SHADCN_RENDERER_DIR}/node_modules`))) {
@@ -2302,20 +2321,15 @@ const ensureShadcnPackageRendererReady = async (): Promise<boolean> => {
   }
 
   shadcnRendererReady = true;
-  return true;
 };
 
-const tryBuildShadcnPackageHtml = async (
+const buildShadcnPackageHtml = async (
   summary: ReportSummary,
   narrative: NarrativeSections,
   context: ReportContext,
   normalizedIssues: NormalizedIssue[],
-): Promise<string | undefined> => {
-  const ready = await ensureShadcnPackageRendererReady();
-  if (!ready) {
-    return undefined;
-  }
-
+): Promise<string> => {
+  await ensureShadcnPackageRendererReady();
   const payload = {
     summary,
     narrative,
@@ -2422,22 +2436,12 @@ export const buildRunReport = async (
     context,
     appendixIssues,
   );
-  let html = buildReportHtml(
+  const html = await buildShadcnPackageHtml(
     summary,
     narrative,
     context,
     appendixIssues,
   );
-
-  const shadcnHtml = await tryBuildShadcnPackageHtml(
-    summary,
-    narrative,
-    context,
-    appendixIssues,
-  );
-  if (shadcnHtml) {
-    html = shadcnHtml;
-  }
 
   return {
     normalizedIssues,

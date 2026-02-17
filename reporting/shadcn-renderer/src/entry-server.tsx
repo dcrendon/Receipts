@@ -100,7 +100,17 @@ const IMPACT_LEGEND_ITEMS = [
   "80+: high-impact activity with strong execution and ownership signals.",
   "50-79: meaningful progress with clear contribution momentum.",
   "0-49: lower impact or early-stage activity that still needs follow-through.",
-  "Score inputs: completed +40, active +20, blocked +10, authored +15, assigned +10, user comments +2 each (max +10), high-impact labels +12, updated in final 48h +8.",
+];
+
+const IMPACT_SCORE_INPUT_ITEMS = [
+  "completed +40",
+  "active +20",
+  "blocked +10",
+  "authored +15",
+  "assigned +10",
+  "user comments +2 each (max +10)",
+  "high-impact labels +12",
+  "updated in final 48h +8",
 ];
 
 const STYLE_BLOCK = `
@@ -156,16 +166,8 @@ const STYLE_BLOCK = `
     display: grid;
     gap: 1rem;
   }
-  .eyebrow {
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: hsl(var(--primary));
-  }
   .hero-title {
-    margin: 0.2rem 0 0;
+    margin: 0;
     font-size: clamp(2rem, 5vw, 3.2rem);
     line-height: 1;
     letter-spacing: -0.03em;
@@ -334,7 +336,31 @@ const STYLE_BLOCK = `
   .talk-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.65rem;
+    gap: 0.55rem;
+  }
+  .score-inputs {
+    margin-top: 0.6rem;
+  }
+  .score-inputs-label {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+  .score-inputs-list {
+    margin: 0.3rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.12rem;
+    font-size: 0.82rem;
+    font-family: "JetBrains Mono", monospace;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.3;
+  }
+  .score-inputs-list li {
+    margin: 0;
   }
   .empty-state {
     border: 1px dashed hsl(var(--border));
@@ -493,14 +519,13 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
             <CardContent className="pt-0">
               <div className="hero-grid">
                 <div>
-                  <p className="eyebrow">shadcn/ui package renderer</p>
                   <h1 className="hero-title">Engineering Activity Report</h1>
                   <p className="hero-meta">
                     Window: {windowLabel} | Fetch Mode: {context.fetchMode}{" "}
                     | Profile: {context.reportProfile}
                   </p>
                   <p className="hero-meta">
-                    Executive Headline
+                    Summary
                     {narrative.aiAssisted.executiveHeadline
                       ? (
                         <Badge className="ml-2" variant="default">
@@ -596,6 +621,14 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 {IMPACT_LEGEND_ITEMS.map((item) => <li key={item}>{item}</li>)}
               </ul>
+              <div className="score-inputs">
+                <p className="score-inputs-label">Score inputs:</p>
+                <ul className="score-inputs-list">
+                  {IMPACT_SCORE_INPUT_ITEMS.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
             </CardContent>
           </Card>
 
@@ -798,17 +831,17 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
                     {narrative.weeklyTalkingPoints.map((point, index) => (
                       <Card
                         key={`${point.lead}-${index}`}
-                        className="talk-card"
+                        className="talk-card gap-2 py-3"
                       >
-                        <CardHeader className="pb-2">
+                        <CardHeader className="pb-1 pt-0">
                           <CardTitle className="text-base">
                             {point.lead}
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-0">
                           {point.bullets.length
                             ? (
-                              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                              <ul className="talk-list list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
                                 {point.bullets.map((bullet, bulletIndex) => (
                                   <li key={`${bullet}-${bulletIndex}`}>
                                     {bullet}

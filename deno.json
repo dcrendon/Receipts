@@ -2,7 +2,7 @@
   "tasks": {
     "dev": "deno run --watch main.ts",
     "fmt": "deno fmt",
-    "test": "deno test --allow-read=fixtures"
+    "test": "deno test --allow-read=fixtures,reporting/shadcn-renderer --allow-run=npm"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",

@@ -18,6 +18,14 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install renderer dependencies
+        run: npm --prefix reporting/shadcn-renderer install --no-audit --no-fund
+
       - name: Format check
         run: deno fmt --check
 

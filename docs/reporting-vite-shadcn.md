@@ -21,10 +21,9 @@ workspace at `reporting/shadcn-renderer`.
 4. Payload JSON is streamed to stdin and SSR HTML is read from stdout.
 5. CLI writes `output/reports/*-summary.html`.
 
-If the renderer workspace cannot be read (for example, restricted test
-environments), reporting falls back to the built-in deterministic HTML renderer.
-In normal CLI runs, missing npm permission is treated as an error so the
-package-backed renderer is not silently skipped.
+If the renderer workspace cannot be read, npm permission is missing, or renderer
+build/run fails, report generation now errors immediately instead of silently
+falling back to a different HTML renderer.
 
 ## Renderer workspace layout
 

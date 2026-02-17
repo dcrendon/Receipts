@@ -64,9 +64,9 @@ deno task dev
 deno task fmt
 
 # run tests
-deno test
-# or
 deno task test
+# or, with raw deno permissions:
+deno test --allow-read=fixtures,reporting/shadcn-renderer --allow-run=npm
 
 # command help
 deno run main.ts help
@@ -114,7 +114,8 @@ For non-trivial changes, this repository requires:
 Minimum validation before merge:
 
 - `deno task fmt`
-- `deno test` (or `deno task test`)
+- `deno task test` (or
+  `deno test --allow-read=fixtures,reporting/shadcn-renderer --allow-run=npm`)
 - `deno run main.ts --help`
 - representative provider run when behavior changes
 
@@ -237,6 +238,8 @@ deno run main.ts report --provider all --reportProfile activity_retro --reportFo
 - HTML renderer bootstrap/build error:
   - Ensure Node 20+ and npm are installed.
   - Ensure Deno run permission includes npm (`--allow-run=npm` or `-A`).
+  - Ensure Deno read permission includes `reporting/shadcn-renderer` (or use
+    `--allow-read`).
   - Retry once from repo root: `npm --prefix reporting/shadcn-renderer install`
   - Then rerun your normal single command (`fetch` or `report`).
 
