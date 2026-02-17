@@ -1506,7 +1506,6 @@ export const buildReportHtml = (
           linear-gradient(310deg, rgba(249, 115, 22, 0.08), transparent 55%);
         pointer-events: none;
         filter: blur(20px);
-        animation: bg-shift 18s ease-in-out infinite alternate;
       }
       .shell {
         max-width: 1220px;
@@ -1530,10 +1529,6 @@ export const buildReportHtml = (
         margin-bottom: 0.95rem;
         position: relative;
         overflow: hidden;
-        opacity: 0;
-        transform: translateY(12px);
-        animation: reveal 620ms cubic-bezier(.2,.9,.2,1) forwards;
-        animation-delay: var(--delay, 0ms);
       }
       .hero-card {
         display: grid;
@@ -1964,16 +1959,6 @@ export const buildReportHtml = (
         font-size: 0.76rem;
         font-family: "JetBrains Mono", monospace;
       }
-      .kpi-card, .provider-card, .issue-card, .talk-card, .risk-card, .collab-item {
-        transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
-      }
-      @media (hover: hover) and (pointer: fine) {
-        .kpi-card:hover, .provider-card:hover, .issue-card:hover, .talk-card:hover, .risk-card:hover, .collab-item:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.15);
-          border-color: rgba(37, 99, 235, 0.3);
-        }
-      }
       [data-tip] { position: relative; cursor: help; }
       @media (hover: hover) and (pointer: fine) {
         [data-tip]:hover::after, [data-tip]:focus-visible::after {
@@ -2021,18 +2006,6 @@ export const buildReportHtml = (
         .risk-index { width: 1.35rem; height: 1.35rem; }
         .legend-list { columns: 1; }
       }
-      @keyframes reveal {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes bg-shift {
-        from { transform: translate3d(0, 0, 0); }
-        to { transform: translate3d(0, 14px, 0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        * { animation: none !important; transition: none !important; }
-        body::before { animation: none !important; }
-      }
       @media print {
         body { background: #fff; }
         body::before { display: none; }
@@ -2049,7 +2022,7 @@ export const buildReportHtml = (
   </head>
   <body>
     <main class="shell">
-      <section class="section-card hero-card" style="--delay: 20ms;">
+      <section class="section-card hero-card">
         <div class="hero-grid">
           <div>
             <h1 class="hero-title" ${
@@ -2105,7 +2078,7 @@ export const buildReportHtml = (
         <p class="generated">Generated: ${escapeHtml(generatedAt)}</p>
       </section>
 
-      <section class="section-card" style="--delay: 80ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes("Primary KPIs for this report window.")
   }>KPI Row</h2>
@@ -2120,7 +2093,7 @@ export const buildReportHtml = (
         </div>
       </section>
 
-      <section class="section-card" style="--delay: 130ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "How to interpret impact score values shown across highlights and appendix.",
@@ -2129,7 +2102,7 @@ export const buildReportHtml = (
         <ul class="legend-list">${impactLegend}</ul>
       </section>
 
-      <section class="section-card" style="--delay: 180ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "Top ranked issues by deterministic impact score, then recency, then key.",
@@ -2142,7 +2115,7 @@ export const buildReportHtml = (
         <div class="highlight-grid">${topCards}</div>
       </section>
 
-      <section class="section-card" style="--delay: 230ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "Total issues where configured user was author, assignee, or comment contributor.",
@@ -2161,7 +2134,7 @@ export const buildReportHtml = (
         </div>
       </section>
 
-      <section class="section-card" style="--delay: 280ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "Action-focused follow-ups selected from blocked/high-risk/high-impact active work.",
@@ -2170,7 +2143,7 @@ export const buildReportHtml = (
         <ul class="followup-list">${riskItems}</ul>
       </section>
 
-      <section class="section-card" style="--delay: 330ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "Structured talking points for weekly updates with concise, vertical bullet detail.",
@@ -2183,7 +2156,7 @@ export const buildReportHtml = (
         <div class="talk-grid">${talkingItems}</div>
       </section>
 
-      <section class="section-card" style="--delay: 380ms;">
+      <section class="section-card">
         <h2 class="section-title" ${
     tooltipAttributes(
       "Ranked issue appendix with deterministic attribution fields.",
