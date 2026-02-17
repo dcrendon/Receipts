@@ -3,7 +3,7 @@ import {
   loadEnvConfig,
   promptExit,
 } from "./config/config.ts";
-import { getDateRange, getPreviousDateRange } from "./config/dates.ts";
+import { getDateRange } from "./config/dates.ts";
 import {
   getProviderReadiness,
   providerLabel as readinessProviderLabel,
@@ -60,10 +60,8 @@ const runFetch = async (config: Config) => {
   }
 
   const { startDate, endDate } = getDateRange(config);
-  const previousWindow = getPreviousDateRange({ startDate, endDate });
   const runResults: ProviderRunResult[] = [];
   const successfulIssues: Partial<Record<ProviderName, unknown[]>> = {};
-  const previousIssues: Partial<Record<ProviderName, unknown[]>> = {};
   const adapters = getProviderAdapters();
   const requestedProviders = readiness.runnableProviders;
 
@@ -90,20 +88,6 @@ const runFetch = async (config: Config) => {
         issueCount: issues.length,
       });
       successfulIssues[adapter.name] = issues;
-
-      try {
-        previousIssues[adapter.name] = await adapter.fetchIssues(config, {
-          startDate: previousWindow.startDate,
-          endDate: previousWindow.endDate,
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error
-          ? error.message
-          : String(error);
-        console.error(
-          `\n${providerTitle} previous-window fetch failed: ${errorMessage}`,
-        );
-      }
     } catch (error) {
       const errorMessage = error instanceof Error
         ? error.message
@@ -143,7 +127,6 @@ const runFetch = async (config: Config) => {
           github: config.githubUsername,
         },
       }, {
-        previousProviderIssues: previousIssues,
         diagnostics: {
           sourceMode: "fetch",
           requestedProviders,

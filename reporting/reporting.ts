@@ -94,10 +94,8 @@ export interface NarrativeSections {
 export interface RunReport {
   normalizedIssues: NormalizedIssue[];
   summary: ReportSummary;
-  comparison: ReportComparisonSummary;
   coverage: ReportCoverageSummary;
   providerDistribution: Array<{ provider: ProviderName; count: number }>;
-  trendSeries: TrendPoint[];
   markdown: string;
   html: string;
   reportFormat: ReportFormat;
@@ -118,20 +116,6 @@ export interface ReportContext {
   usernames?: Partial<Record<ProviderName, string>>;
 }
 
-export interface ComparisonDelta {
-  current: number;
-  previous: number;
-  delta: number;
-}
-
-export interface ReportComparisonSummary {
-  available: boolean;
-  completed: ComparisonDelta | null;
-  active: ComparisonDelta | null;
-  blocked: ComparisonDelta | null;
-  comments: ComparisonDelta | null;
-}
-
 export interface ReportCoverageSummary {
   sourceMode: "fetch" | "report";
   requestedProviders: ProviderName[];
@@ -142,15 +126,7 @@ export interface ReportCoverageSummary {
   partialFailures: number;
 }
 
-export interface TrendPoint {
-  label: string;
-  completed: number;
-  active: number;
-  blocked: number;
-}
-
 export interface ReportBuildOptions {
-  previousProviderIssues?: Partial<Record<ProviderName, unknown[]>>;
   diagnostics?: {
     sourceMode?: "fetch" | "report";
     requestedProviders?: ProviderName[];
@@ -1118,7 +1094,6 @@ export const buildReportMarkdown = (
   narrative: NarrativeSections,
   context: ReportContext,
   normalizedIssues: NormalizedIssue[],
-  comparison?: ReportComparisonSummary,
   coverage?: ReportCoverageSummary,
 ): string => {
   const lines: string[] = [
@@ -1223,17 +1198,6 @@ export const buildReportMarkdown = (
         } | ${issue.isCommentedByUser ? "yes" : "no"} |`,
       );
     }
-  }
-
-  lines.push("", "## Comparison");
-  if (!comparison?.available || !comparison.completed || !comparison.active ||
-    !comparison.blocked || !comparison.comments) {
-    lines.push("- Week-over-week deltas unavailable (missing previous window data).");
-  } else {
-    lines.push(`- Completed: ${comparison.completed.current} (${comparison.completed.delta >= 0 ? "+" : ""}${comparison.completed.delta})`);
-    lines.push(`- Active: ${comparison.active.current} (${comparison.active.delta >= 0 ? "+" : ""}${comparison.active.delta})`);
-    lines.push(`- Blocked: ${comparison.blocked.current} (${comparison.blocked.delta >= 0 ? "+" : ""}${comparison.blocked.delta})`);
-    lines.push(`- Comments: ${comparison.comments.current} (${comparison.comments.delta >= 0 ? "+" : ""}${comparison.comments.delta})`);
   }
 
   if (coverage) {
@@ -2294,6 +2258,7 @@ export const buildReportHtml = (
 };
 
 const SHADCN_RENDERER_DIR = "reporting/shadcn-renderer";
+const SHADCN_RENDERER_SOURCE = `${SHADCN_RENDERER_DIR}/src/entry-server.tsx`;
 const SHADCN_RENDERER_ENTRY =
   `${SHADCN_RENDERER_DIR}/dist/server/entry-server.js`;
 let shadcnRendererReady = false;
@@ -2330,6 +2295,21 @@ const pathExists = async (path: string): Promise<boolean> => {
     }
     throw error;
   }
+};
+
+const rendererBuildIsStale = async (): Promise<boolean> => {
+  if (!(await pathExists(SHADCN_RENDERER_ENTRY))) {
+    return true;
+  }
+
+  const [sourceStat, distStat] = await Promise.all([
+    Deno.stat(SHADCN_RENDERER_SOURCE),
+    Deno.stat(SHADCN_RENDERER_ENTRY),
+  ]);
+
+  const sourceMtime = sourceStat.mtime?.getTime() ?? 0;
+  const distMtime = distStat.mtime?.getTime() ?? 0;
+  return sourceMtime > distMtime;
 };
 
 const assertPathReadable = async (
@@ -2401,7 +2381,7 @@ const ensureShadcnPackageRendererReady = async (): Promise<void> => {
     );
   }
 
-  if (!(await pathExists(SHADCN_RENDERER_ENTRY))) {
+  if (await rendererBuildIsStale()) {
     await runNpmInRenderer(
       ["run", "build"],
       "Failed to build Vite shadcn renderer.",
@@ -2416,10 +2396,8 @@ const buildShadcnPackageHtml = async (
   narrative: NarrativeSections,
   context: ReportContext,
   normalizedIssues: NormalizedIssue[],
-  comparison: ReportComparisonSummary,
   coverage: ReportCoverageSummary,
   providerDistribution: Array<{ provider: ProviderName; count: number }>,
-  trendSeries: TrendPoint[],
 ): Promise<string> => {
   await ensureShadcnPackageRendererReady();
   const payload = {
@@ -2427,10 +2405,8 @@ const buildShadcnPackageHtml = async (
     narrative,
     context,
     normalizedIssues,
-    comparison,
     coverage,
     providerDistribution,
-    trendSeries,
   };
 
   const child = new Deno.Command("npm", {
@@ -2498,53 +2474,6 @@ const applyIssueScoring = (
   }));
 };
 
-const buildComparisonDelta = (
-  current: number,
-  previous: number,
-): ComparisonDelta => ({
-  current,
-  previous,
-  delta: current - previous,
-});
-
-const buildComparisonSummary = (
-  currentIssues: NormalizedIssue[],
-  previousIssues?: NormalizedIssue[],
-): ReportComparisonSummary => {
-  if (!previousIssues || previousIssues.length === 0) {
-    return {
-      available: false,
-      completed: null,
-      active: null,
-      blocked: null,
-      comments: null,
-    };
-  }
-
-  const currentSummary = buildReportSummary(currentIssues);
-  const previousSummary = buildReportSummary(previousIssues);
-
-  return {
-    available: true,
-    completed: buildComparisonDelta(
-      currentSummary.byBucket.completed,
-      previousSummary.byBucket.completed,
-    ),
-    active: buildComparisonDelta(
-      currentSummary.byBucket.active,
-      previousSummary.byBucket.active,
-    ),
-    blocked: buildComparisonDelta(
-      currentSummary.byBucket.blocked,
-      previousSummary.byBucket.blocked,
-    ),
-    comments: buildComparisonDelta(
-      currentSummary.contribution.totalUserComments,
-      previousSummary.contribution.totalUserComments,
-    ),
-  };
-};
-
 const buildCoverageSummary = (
   summary: ReportSummary,
   diagnostics?: ReportBuildOptions["diagnostics"],
@@ -2586,31 +2515,6 @@ const buildProviderDistribution = (
   }));
 };
 
-const buildTrendSeries = (
-  summary: ReportSummary,
-  comparison: ReportComparisonSummary,
-): TrendPoint[] => {
-  if (!comparison.available || !comparison.completed || !comparison.active ||
-    !comparison.blocked) {
-    return [];
-  }
-
-  return [
-    {
-      label: "Previous",
-      completed: comparison.completed.previous,
-      active: comparison.active.previous,
-      blocked: comparison.blocked.previous,
-    },
-    {
-      label: "Current",
-      completed: summary.byBucket.completed,
-      active: summary.byBucket.active,
-      blocked: summary.byBucket.blocked,
-    },
-  ];
-};
-
 export const buildRunReport = async (
   providerIssues: Partial<Record<ProviderName, unknown[]>>,
   context: ReportContext,
@@ -2619,8 +2523,6 @@ export const buildRunReport = async (
   const generatedAt = context.generatedAt ?? new Date().toISOString();
   const usernames = context.usernames ?? {};
   const normalizedIssuesBase: NormalizedIssue[] = [];
-  const previousProviderIssues = options.previousProviderIssues ?? {};
-  const previousNormalizedBase: NormalizedIssue[] = [];
 
   for (const provider of Object.keys(providerIssues) as ProviderName[]) {
     normalizedIssuesBase.push(
@@ -2632,36 +2534,15 @@ export const buildRunReport = async (
     );
   }
 
-  for (
-    const provider of Object.keys(previousProviderIssues) as ProviderName[]
-  ) {
-    previousNormalizedBase.push(
-      ...normalizeProviderIssues(
-        provider,
-        previousProviderIssues[provider] ?? [],
-        usernames[provider],
-      ),
-    );
-  }
-
   const normalizedIssues = applyIssueScoring(
     normalizedIssuesBase,
     context.endDate,
   )
     .sort(compareIssues);
-  const previousNormalizedIssues = applyIssueScoring(
-    previousNormalizedBase,
-    context.endDate,
-  ).sort(compareIssues);
 
   const summary = buildReportSummary(normalizedIssues, context.reportProfile);
-  const comparison = buildComparisonSummary(
-    normalizedIssues,
-    previousNormalizedIssues,
-  );
   const coverage = buildCoverageSummary(summary, options.diagnostics);
   const providerDistribution = buildProviderDistribution(summary.byProvider);
-  const trendSeries = buildTrendSeries(summary, comparison);
   const narrative = await buildNarrativeWithAi(summary, context, coverage);
   const settings = PROFILE_SETTINGS[context.reportProfile];
   const appendixIssues = normalizedIssues.slice(0, settings.appendix);
@@ -2671,7 +2552,6 @@ export const buildRunReport = async (
     narrative,
     { ...context, generatedAt },
     appendixIssues,
-    comparison,
     coverage,
   );
   const html = await buildShadcnPackageHtml(
@@ -2679,19 +2559,15 @@ export const buildRunReport = async (
     narrative,
     { ...context, generatedAt },
     appendixIssues,
-    comparison,
     coverage,
     providerDistribution,
-    trendSeries,
   );
 
   return {
     normalizedIssues,
     summary,
-    comparison,
     coverage,
     providerDistribution,
-    trendSeries,
     markdown,
     html,
     reportFormat: context.reportFormat,

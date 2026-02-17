@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes, assertNotEquals } from "@std/assert";
 import {
   buildReportSummary,
   buildRunReport,
@@ -189,8 +189,8 @@ Deno.test("buildRunReport applies deterministic impact scoring, ordering, and se
   assertStringIncludes(report.markdown, "## Risks and Follow-ups");
   assertStringIncludes(report.markdown, "## Weekly Activity Talking Points");
   assertStringIncludes(report.markdown, "## Appendix");
-  assertStringIncludes(report.markdown, "## Comparison");
   assertStringIncludes(report.markdown, "## Coverage");
+  assertEquals(report.markdown.includes("## Comparison"), false);
 
   assertStringIncludes(report.html, "Activity Report");
   assertStringIncludes(report.html, "Top Highlights");
@@ -199,18 +199,18 @@ Deno.test("buildRunReport applies deterministic impact scoring, ordering, and se
   assertStringIncludes(report.html, "Talking Points");
   assertStringIncludes(report.html, "Appendix");
   assertStringIncludes(report.html, "Export CSV");
-  assertStringIncludes(report.html, "How scoring works");
-  assertStringIncludes(report.html, "completed +40");
-  assertEquals(
-    report.html.includes("Score inputs: completed +40, active +20"),
-    false,
-  );
-  assertEquals(report.comparison.available, false);
+  assertEquals(report.html.includes("Week-over-week"), false);
+  assertEquals(report.html.includes("vs previous"), false);
+  assertStringIncludes(report.html, "DOMContentLoaded");
+  assertStringIncludes(report.html, "data-sidepanel");
+  assertStringIncludes(report.html, "data-search");
+  assertStringIncludes(report.html, "data-filter-provider");
+  assertStringIncludes(report.html, "data-row");
   assertEquals(report.coverage.sourceMode, "report");
   assertEquals(report.coverage.totalProviderCount, 3);
 });
 
-Deno.test("buildRunReport computes comparison deltas when previous issues are provided", async () => {
+Deno.test("buildRunReport is current-window only and ignores previous-window options", async () => {
   const report = await buildRunReport(
     {
       github: [{
@@ -239,21 +239,6 @@ Deno.test("buildRunReport computes comparison deltas when previous issues are pr
       usernames: { github: "mock.user" },
     },
     {
-      previousProviderIssues: {
-        github: [{
-          id: 11,
-          number: 11,
-          title: "Previous issue",
-          state: "open",
-          created_at: "2026-02-03T00:00:00Z",
-          updated_at: "2026-02-09T22:30:00Z",
-          user: { login: "teammate" },
-          assignees: [{ login: "teammate" }],
-          labels: [{ name: "maintenance" }],
-          comments: 0,
-          notes: [],
-        }],
-      },
       diagnostics: {
         sourceMode: "fetch",
         requestedProviders: ["github"],
@@ -262,11 +247,10 @@ Deno.test("buildRunReport computes comparison deltas when previous issues are pr
     },
   );
 
-  assertEquals(report.comparison.available, true);
-  assertEquals(report.comparison.completed?.current, 1);
-  assertEquals(report.comparison.completed?.previous, 0);
-  assertEquals(report.comparison.active?.current, 0);
-  assertEquals(report.comparison.active?.previous, 1);
+  assertNotEquals(report.normalizedIssues[0].impactScore, 0);
+  assertEquals(report.markdown.includes("## Comparison"), false);
+  assertEquals(report.html.includes("Previous"), false);
+  assertEquals(report.html.includes("vs previous"), false);
   assertEquals(report.coverage.connectedProviderCount, 1);
   assertEquals(report.coverage.partialFailures, 0);
 });
