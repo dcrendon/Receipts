@@ -235,9 +235,7 @@ export const runConfigWizard = async (
     seed.reportProfile ?? "activity_retro",
   );
   const reportFormat = FIXED_REPORT_FORMAT;
-  console.log("Step 5/6 - Report format is fixed to: html");
   const aiNarrative = FIXED_AI_NARRATIVE;
-  console.log("Step 6/6 - AI narrative mode is fixed to: auto");
 
   const aiModel = askRequiredText("AI model", seed.aiModel ?? DEFAULT_AI_MODEL);
 
