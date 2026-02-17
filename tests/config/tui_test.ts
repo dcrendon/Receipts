@@ -3,6 +3,7 @@ import {
   formatProviderReadinessSummary,
   getDefaultOutFile,
   normalizeChoice,
+  resolveAiWizardConfig,
 } from "../../config/tui.ts";
 import { Config } from "../../shared/types.ts";
 
@@ -55,4 +56,35 @@ Deno.test("formatProviderReadinessSummary includes missing fields", () => {
     true,
   );
   assertEquals(lines.some((line) => line.includes("GitHub: ready")), true);
+});
+
+Deno.test("resolveAiWizardConfig disables AI when OPENAI_API_KEY is missing", () => {
+  const decision = resolveAiWizardConfig(
+    baseConfig({
+      openaiApiKey: undefined,
+      aiModel: "gpt-4o-mini",
+    }),
+  );
+
+  assertEquals(decision.aiNarrative, "off");
+  assertEquals(decision.aiModel, "gpt-4o-mini");
+  assertEquals(decision.shouldPromptForModel, false);
+  assertEquals(
+    decision.statusMessage,
+    "Step 5/6 - AI is disabled for this run (OPENAI_API_KEY not set).",
+  );
+});
+
+Deno.test("resolveAiWizardConfig prompts for model when OPENAI_API_KEY is present", () => {
+  const decision = resolveAiWizardConfig(
+    baseConfig({
+      openaiApiKey: "secret",
+      aiModel: "gpt-4o-mini",
+    }),
+  );
+
+  assertEquals(decision.aiNarrative, "auto");
+  assertEquals(decision.aiModel, "gpt-4o-mini");
+  assertEquals(decision.shouldPromptForModel, true);
+  assertEquals(decision.statusMessage, "Step 5/6 - Configure AI model");
 });

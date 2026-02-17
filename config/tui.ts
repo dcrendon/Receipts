@@ -24,6 +24,36 @@ const DEFAULT_AI_MODEL = "5.2";
 const isNonEmpty = (value: string | null): value is string =>
   Boolean(value && value.trim().length > 0);
 
+interface AiWizardConfigDecision {
+  aiNarrative: Config["aiNarrative"];
+  aiModel: string;
+  shouldPromptForModel: boolean;
+  statusMessage: string;
+}
+
+export const resolveAiWizardConfig = (
+  seed: Config,
+): AiWizardConfigDecision => {
+  const defaultModel = seed.aiModel ?? DEFAULT_AI_MODEL;
+
+  if (!seed.openaiApiKey) {
+    return {
+      aiNarrative: "off",
+      aiModel: defaultModel,
+      shouldPromptForModel: false,
+      statusMessage:
+        "Step 5/6 - AI is disabled for this run (OPENAI_API_KEY not set).",
+    };
+  }
+
+  return {
+    aiNarrative: FIXED_AI_NARRATIVE,
+    aiModel: defaultModel,
+    shouldPromptForModel: true,
+    statusMessage: "Step 5/6 - Configure AI model",
+  };
+};
+
 export const getDefaultOutFile = (provider: Config["provider"]): string => {
   if (provider === "gitlab") return `${OUTPUT_DIR}/gitlab_issues.json`;
   if (provider === "jira") return `${OUTPUT_DIR}/jira_issues.json`;
@@ -235,9 +265,12 @@ export const runConfigWizard = async (
     seed.reportProfile ?? "activity_retro",
   );
   const reportFormat = FIXED_REPORT_FORMAT;
-  const aiNarrative = FIXED_AI_NARRATIVE;
-
-  const aiModel = askRequiredText("AI model", seed.aiModel ?? DEFAULT_AI_MODEL);
+  const aiConfig = resolveAiWizardConfig(seed);
+  console.log(aiConfig.statusMessage);
+  const aiNarrative = aiConfig.aiNarrative;
+  const aiModel = aiConfig.shouldPromptForModel
+    ? askRequiredText("AI model", aiConfig.aiModel)
+    : aiConfig.aiModel;
 
   const outFile = provider === "all"
     ? `${OUTPUT_DIR}/issues.json`
