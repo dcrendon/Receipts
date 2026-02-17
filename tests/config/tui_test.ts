@@ -29,6 +29,7 @@ Deno.test("normalizeChoice validates and normalizes input", () => {
   const allowed = ["gitlab", "jira", "github"] as const;
   assertEquals(normalizeChoice("GitHub", allowed), "github");
   assertEquals(normalizeChoice(" jira ", allowed), "jira");
+  assertEquals(normalizeChoice("", allowed), undefined);
   assertEquals(normalizeChoice("invalid", allowed), undefined);
 });
 

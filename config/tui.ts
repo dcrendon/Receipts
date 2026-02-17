@@ -1,11 +1,9 @@
 import { promptSecret } from "@std/cli";
 import { Config } from "../shared/types.ts";
 import {
-  AI_NARRATIVE_MODES,
   parseAiNarrativeMode,
   parseReportFormat,
   parseReportProfile,
-  REPORT_FORMATS,
   REPORT_PROFILES,
 } from "./report_options.ts";
 import {
@@ -15,10 +13,13 @@ import {
 } from "./provider_readiness.ts";
 import { ProviderName } from "../providers/types.ts";
 
-const PROVIDERS = ["gitlab", "jira", "github", "all"] as const;
 const TIME_RANGES = ["week", "month", "year", "custom"] as const;
 const FETCH_MODES = ["my_issues", "all_contributions"] as const;
 const OUTPUT_DIR = "output";
+const FIXED_PROVIDER: Config["provider"] = "all";
+const FIXED_REPORT_FORMAT: Config["reportFormat"] = "html";
+const FIXED_AI_NARRATIVE: Config["aiNarrative"] = "auto";
+const DEFAULT_AI_MODEL = "5.2";
 
 const isNonEmpty = (value: string | null): value is string =>
   Boolean(value && value.trim().length > 0);
@@ -36,6 +37,7 @@ export const normalizeChoice = <T extends readonly string[]>(
 ): T[number] | undefined => {
   if (!rawValue) return undefined;
   const normalized = rawValue.trim().toLowerCase();
+  if (!normalized) return undefined;
   const found = allowed.find((value) => value === normalized);
   return found;
 };
@@ -49,7 +51,8 @@ const askChoice = <T extends readonly string[]>(
     const raw = prompt(
       `${question} [${options.join("/")}] (default: ${defaultValue})`,
     );
-    const value = normalizeChoice(raw ?? defaultValue, options);
+    const value = normalizeChoice(raw ?? undefined, options) ??
+      normalizeChoice(defaultValue, options);
     if (value) return value;
     console.log(`Invalid value. Use one of: ${options.join(", ")}`);
   }
@@ -198,11 +201,8 @@ export const runConfigWizard = async (
     "Configure this run. Missing provider credentials can be added now.\n",
   );
 
-  const provider = askChoice(
-    "Step 1/6 - Select provider",
-    PROVIDERS,
-    normalizeChoice(seed.provider, PROVIDERS) ?? "all",
-  );
+  const provider = FIXED_PROVIDER;
+  console.log("Step 1/6 - Provider is fixed to: all");
 
   const timeRange = askChoice(
     "Step 2/6 - Select time range",
@@ -234,20 +234,12 @@ export const runConfigWizard = async (
     REPORT_PROFILES,
     seed.reportProfile ?? "activity_retro",
   );
-  const reportFormat = askChoice(
-    "Step 5/6 - Select report format",
-    REPORT_FORMATS,
-    seed.reportFormat ?? "html",
-  );
-  const aiNarrative = askChoice(
-    "Step 6/6 - Select AI narrative mode",
-    AI_NARRATIVE_MODES,
-    seed.aiNarrative ?? "auto",
-  );
+  const reportFormat = FIXED_REPORT_FORMAT;
+  console.log("Step 5/6 - Report format is fixed to: html");
+  const aiNarrative = FIXED_AI_NARRATIVE;
+  console.log("Step 6/6 - AI narrative mode is fixed to: auto");
 
-  const aiModel = aiNarrative === "off"
-    ? seed.aiModel ?? "gpt-4o-mini"
-    : askRequiredText("AI model", seed.aiModel ?? "gpt-4o-mini");
+  const aiModel = askRequiredText("AI model", seed.aiModel ?? DEFAULT_AI_MODEL);
 
   const outFile = provider === "all"
     ? `${OUTPUT_DIR}/issues.json`
@@ -265,8 +257,8 @@ export const runConfigWizard = async (
     startDate,
     endDate,
     reportProfile: parseReportProfile(reportProfile) ?? "activity_retro",
-    reportFormat: parseReportFormat(reportFormat) ?? "html",
-    aiNarrative: parseAiNarrativeMode(aiNarrative) ?? "auto",
+    reportFormat: parseReportFormat(reportFormat) ?? FIXED_REPORT_FORMAT,
+    aiNarrative: parseAiNarrativeMode(aiNarrative) ?? FIXED_AI_NARRATIVE,
     aiModel,
   };
 
