@@ -19,7 +19,7 @@ const OUTPUT_DIR = "output";
 const FIXED_PROVIDER: Config["provider"] = "all";
 const FIXED_REPORT_FORMAT: Config["reportFormat"] = "html";
 const FIXED_AI_NARRATIVE: Config["aiNarrative"] = "auto";
-const DEFAULT_AI_MODEL = "5.2";
+const DEFAULT_AI_MODEL = "gpt-4o-mini";
 
 const isNonEmpty = (value: string | null): value is string =>
   Boolean(value && value.trim().length > 0);

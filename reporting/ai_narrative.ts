@@ -257,7 +257,7 @@ export const applyAiNarrativeRewrite = async (
   if (!request.apiKey) {
     if (request.mode === "on") {
       throw new Error(
-        "AI narrative mode is `on` but OPENAI_API_KEY is missing. Set OPENAI_API_KEY or use --aiNarrative auto/off.",
+        "AI narrative mode is `on` but OPENAI_API_KEY is missing. Set OPENAI_API_KEY or set AI_NARRATIVE=off.",
       );
     }
     return fallbackResult(request);
@@ -265,7 +265,13 @@ export const applyAiNarrativeRewrite = async (
 
   try {
     return await rewriteWithOpenAI(request);
-  } catch {
+  } catch (error) {
+    if (request.mode === "on") {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`AI narrative rewrite skipped: ${message}`);
     return fallbackResult(request);
   }
 };

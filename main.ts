@@ -117,7 +117,7 @@ const runFetch = async (config: Config) => {
         reportProfile: config.reportProfile ?? "activity_retro",
         reportFormat: config.reportFormat ?? "html",
         aiNarrative: config.aiNarrative ?? "auto",
-        aiModel: config.aiModel ?? "5.2",
+        aiModel: config.aiModel ?? "gpt-4o-mini",
         sourceMode: "fetch",
         generatedAt: new Date().toISOString(),
         openaiApiKey: config.openaiApiKey,

@@ -84,6 +84,35 @@ Deno.test("applyAiNarrativeRewrite falls back when AI response is malformed", as
   }
 });
 
+Deno.test("applyAiNarrativeRewrite throws when mode is on and AI request fails", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = (async () => {
+      return new Response(
+        JSON.stringify({ error: { message: "invalid model" } }),
+        {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }) as typeof fetch;
+
+    await assertRejects(
+      () =>
+        applyAiNarrativeRewrite({
+          ...baseRequest,
+          mode: "on",
+          apiKey: "fake-key",
+        }),
+      Error,
+      "OpenAI request failed",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("applyAiNarrativeRewrite accepts valid structured rewrite", async () => {
   const originalFetch = globalThis.fetch;
 
