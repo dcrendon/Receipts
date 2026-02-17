@@ -2,6 +2,12 @@ import { parseArgs, promptSecret } from "@std/cli";
 import { load } from "@std/dotenv";
 import { getDefaultOutFile, runConfigWizard } from "./tui.ts";
 import { Config } from "../shared/types.ts";
+import {
+  parseAiNarrativeMode,
+  parseAttributionUsername,
+  parseReportFormat,
+  parseReportProfile,
+} from "./report_options.ts";
 
 export const promptExit = (message: string | null, exitCode: number): never => {
   if (message) {
@@ -25,16 +31,22 @@ const parseBoolean = (value?: string): boolean | undefined => {
   return undefined;
 };
 
-const checkENV = async (): Promise<Partial<Config>> => {
+export const loadEnvConfig = async (): Promise<Partial<Config>> => {
   await load({ export: true });
   const gitlabPAT = Deno.env.get("GITLAB_PAT");
   const gitlabURL = Deno.env.get("GITLAB_URL");
+  const gitlabUsername = Deno.env.get("GITLAB_USERNAME");
   const jiraPAT = Deno.env.get("JIRA_PAT");
   const jiraURL = Deno.env.get("JIRA_URL");
   const jiraUsername = Deno.env.get("JIRA_USERNAME");
   const githubPAT = Deno.env.get("GITHUB_PAT");
   const githubURL = Deno.env.get("GITHUB_URL");
   const githubUsername = Deno.env.get("GITHUB_USERNAME");
+  const reportProfile = Deno.env.get("REPORT_PROFILE");
+  const reportFormat = Deno.env.get("REPORT_FORMAT");
+  const aiNarrative = Deno.env.get("AI_NARRATIVE");
+  const aiModel = Deno.env.get("AI_MODEL");
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
   const outFile = Deno.env.get("OUT_FILE");
   const timeRange = Deno.env.get("TIME_RANGE");
   const fetchMode = Deno.env.get("FETCH_MODE");
@@ -54,10 +66,8 @@ const checkENV = async (): Promise<Partial<Config>> => {
     gitlabURL,
     jiraPAT,
     jiraURL,
-    jiraUsername,
     githubPAT,
     githubURL,
-    githubUsername,
     outFile,
     timeRange,
     fetchMode,
@@ -66,6 +76,14 @@ const checkENV = async (): Promise<Partial<Config>> => {
     provider,
     useMockData,
     mockDataDir,
+    gitlabUsername: parseAttributionUsername(gitlabUsername),
+    jiraUsername: parseAttributionUsername(jiraUsername),
+    githubUsername: parseAttributionUsername(githubUsername),
+    reportProfile: parseReportProfile(reportProfile),
+    reportFormat: parseReportFormat(reportFormat),
+    aiNarrative: parseAiNarrativeMode(aiNarrative),
+    aiModel: aiModel?.trim() || undefined,
+    openaiApiKey: openaiApiKey?.trim() || undefined,
     // projectIDs,
   };
   return envParams;
@@ -84,12 +102,16 @@ const printHelp = () => {
       --gitlabURL
           GitLab URL - Required if provider is gitlab
           Alias: --url
+      --gitlabUsername
+          GitLab username used for report attribution
+          Env: GITLAB_USERNAME
       --jiraPAT:
           Jira Personal Access Token - Required if provider is jira
       --jiraURL
           Jira URL - Required if provider is jira
       --jiraUsername
           Jira Username - Required if provider is jira
+          Env: JIRA_USERNAME
       --githubPAT:
           GitHub Personal Access Token - Required if provider is github
       --githubURL
@@ -97,6 +119,7 @@ const printHelp = () => {
           Example: https://api.github.com
       --githubUsername
           GitHub Username - Required if provider is github
+          Env: GITHUB_USERNAME
       --outFile,
           Output file name
           Alias: --out
@@ -130,23 +153,55 @@ const printHelp = () => {
           Directory containing mock fixture files
           Default: fixtures
           Env: MOCK_DATA_DIR
+      --reportProfile
+          Report profile
+          Default: activity_retro
+          Options: brief, activity_retro, showcase
+          Env: REPORT_PROFILE
+      --reportFormat
+          Report output format
+          Default: html
+          Options: markdown, html, both
+          Env: REPORT_FORMAT
+      --aiNarrative
+          AI narrative rewrite mode
+          Default: auto
+          Options: auto, on, off
+          Env: AI_NARRATIVE
+      --aiModel
+          OpenAI model for AI narrative rewrite
+          Default: gpt-4o-mini
+          Env: AI_MODEL
+      OPENAI_API_KEY
+          Required when --aiNarrative on
   `);
   promptExit(null, 0);
 };
 
 export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
-  const envConfig = await checkENV();
+  let envConfig: Partial<Config> = {};
+  try {
+    envConfig = await loadEnvConfig();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    promptExit(message, 1);
+  }
 
   const args = parseArgs(rawArgs, {
     string: [
       "gitlabPAT",
       "gitlabURL",
+      "gitlabUsername",
       "jiraPAT",
       "jiraURL",
       "jiraUsername",
       "githubPAT",
       "githubURL",
       "githubUsername",
+      "reportProfile",
+      "reportFormat",
+      "aiNarrative",
+      "aiModel",
       "outFile",
       "timeRange",
       "fetchMode",
@@ -179,29 +234,53 @@ export const generateConfig = async (rawArgs = Deno.args): Promise<Config> => {
     "useMockData",
   );
 
-  const combinedConfig: Partial<Config> = {
-    provider: (args.provider as "gitlab" | "jira" | "github" | "all") ??
-      envConfig.provider ??
-      "gitlab",
-    gitlabPAT: args.gitlabPAT ?? envConfig.gitlabPAT,
-    gitlabURL: args.gitlabURL ?? envConfig.gitlabURL,
-    jiraPAT: args.jiraPAT ?? envConfig.jiraPAT,
-    jiraURL: args.jiraURL ?? envConfig.jiraURL,
-    jiraUsername: args.jiraUsername ?? envConfig.jiraUsername,
-    githubPAT: args.githubPAT ?? envConfig.githubPAT,
-    githubURL: args.githubURL ?? envConfig.githubURL,
-    githubUsername: args.githubUsername ?? envConfig.githubUsername,
-    outFile: args.outFile ?? envConfig.outFile,
-    timeRange: args.timeRange ?? envConfig.timeRange ?? "week",
-    fetchMode: args.fetchMode ?? envConfig.fetchMode ?? "all_contributions",
-    startDate: args.startDate ?? envConfig.startDate,
-    endDate: args.endDate ?? envConfig.endDate,
-    useMockData: hasUseMockDataArg
-      ? Boolean(args.useMockData)
-      : envConfig.useMockData ?? false,
-    mockDataDir: args.mockDataDir ?? envConfig.mockDataDir,
-    // projectIDs: (args.projectIDs as string[]) ?? envConfig.projectIDs,
-  };
+  let combinedConfig: Partial<Config> = {};
+  try {
+    combinedConfig = {
+      provider: (args.provider as "gitlab" | "jira" | "github" | "all") ??
+        envConfig.provider ??
+        "gitlab",
+      gitlabPAT: args.gitlabPAT ?? envConfig.gitlabPAT,
+      gitlabURL: args.gitlabURL ?? envConfig.gitlabURL,
+      gitlabUsername: parseAttributionUsername(
+        args.gitlabUsername ?? envConfig.gitlabUsername,
+      ),
+      jiraPAT: args.jiraPAT ?? envConfig.jiraPAT,
+      jiraURL: args.jiraURL ?? envConfig.jiraURL,
+      jiraUsername: parseAttributionUsername(
+        args.jiraUsername ?? envConfig.jiraUsername,
+      ),
+      githubPAT: args.githubPAT ?? envConfig.githubPAT,
+      githubURL: args.githubURL ?? envConfig.githubURL,
+      githubUsername: parseAttributionUsername(
+        args.githubUsername ?? envConfig.githubUsername,
+      ),
+      reportProfile: parseReportProfile(
+        args.reportProfile ?? envConfig.reportProfile,
+      ) ?? "activity_retro",
+      reportFormat:
+        parseReportFormat(args.reportFormat ?? envConfig.reportFormat) ??
+          "html",
+      aiNarrative: parseAiNarrativeMode(
+        args.aiNarrative ?? envConfig.aiNarrative,
+      ) ?? "auto",
+      aiModel: (args.aiModel ?? envConfig.aiModel ?? "gpt-4o-mini").trim(),
+      openaiApiKey: envConfig.openaiApiKey,
+      outFile: args.outFile ?? envConfig.outFile,
+      timeRange: args.timeRange ?? envConfig.timeRange ?? "week",
+      fetchMode: args.fetchMode ?? envConfig.fetchMode ?? "all_contributions",
+      startDate: args.startDate ?? envConfig.startDate,
+      endDate: args.endDate ?? envConfig.endDate,
+      useMockData: hasUseMockDataArg
+        ? Boolean(args.useMockData)
+        : envConfig.useMockData ?? false,
+      mockDataDir: args.mockDataDir ?? envConfig.mockDataDir,
+      // projectIDs: (args.projectIDs as string[]) ?? envConfig.projectIDs,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    promptExit(message, 1);
+  }
 
   if (args.tui) {
     return await runConfigWizard(combinedConfig);
@@ -337,6 +416,10 @@ Configuration:
   }
   - Time Range: ${finalConfig.timeRange}
   - Fetch Mode: ${finalConfig.fetchMode}
+  - Report Profile: ${finalConfig.reportProfile}
+  - Report Format: ${finalConfig.reportFormat}
+  - AI Narrative: ${finalConfig.aiNarrative}
+  - AI Model: ${finalConfig.aiModel}
   - Mock Data: ${finalConfig.useMockData ? "enabled" : "disabled"}
   - Mock Dir: ${finalConfig.mockDataDir ?? "fixtures"}`);
 

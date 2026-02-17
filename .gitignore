@@ -6,3 +6,4 @@ jira_issues.json
 github_issues.json
 gitlab-issues.exe
 *.png
+node_modules/

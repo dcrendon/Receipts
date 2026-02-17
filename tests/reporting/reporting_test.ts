@@ -5,7 +5,7 @@ import {
   normalizeProviderIssues,
 } from "../../reporting/reporting.ts";
 
-Deno.test("normalizeProviderIssues normalizes all providers", () => {
+Deno.test("normalizeProviderIssues normalizes attribution fields across providers", () => {
   const gitlab = normalizeProviderIssues("gitlab", [{
     id: 1,
     iid: 10,
@@ -13,11 +13,12 @@ Deno.test("normalizeProviderIssues normalizes all providers", () => {
     state: "opened",
     created_at: "2026-02-01T00:00:00Z",
     updated_at: "2026-02-02T00:00:00Z",
-    author: { username: "gl-user" },
-    assignees: [{ username: "gl-assignee" }],
+    author: { username: "mock.user" },
+    assignees: [{ username: "teammate" }],
     labels: ["bug"],
-    notes: [{ id: 1 }],
-  }]);
+    description: "A gitlab description",
+    notes: [{ id: 1, author: { username: "mock.user" } }],
+  }], "mock.user");
 
   const jira = normalizeProviderIssues("jira", [{
     id: "20",
@@ -27,33 +28,48 @@ Deno.test("normalizeProviderIssues normalizes all providers", () => {
       status: { name: "Done" },
       created: "2026-02-01T00:00:00Z",
       updated: "2026-02-03T00:00:00Z",
-      reporter: { displayName: "jira-user" },
-      assignee: { displayName: "jira-assignee" },
+      reporter: { displayName: "teammate" },
+      assignee: { displayName: "mock.user" },
       labels: ["ops"],
+      description: "jira desc",
     },
-    notes: [{ id: "n1" }, { id: "n2" }],
-  }]);
+    notes: [{ id: "n1", author: { displayName: "mock.user" } }],
+  }], "mock.user");
 
   const github = normalizeProviderIssues("github", [{
     id: 3,
     number: 99,
     title: "GH issue",
-    state: "open",
+    state: "closed",
+    body: "github description",
     created_at: "2026-02-01T00:00:00Z",
     updated_at: "2026-02-04T00:00:00Z",
-    user: { login: "gh-user" },
-    assignees: [{ login: "gh-assignee" }],
+    user: { login: "teammate" },
+    assignees: [{ login: "mock.user" }],
     labels: [{ name: "enhancement" }],
     comments: 3,
-  }]);
+    notes: [{ id: 1, user: { login: "mock.user" } }],
+  }], "mock.user");
 
   assertEquals(gitlab[0].provider, "gitlab");
+  assertEquals(gitlab[0].bucket, "active");
+  assertEquals(gitlab[0].isAuthoredByUser, true);
+  assertEquals(gitlab[0].isCommentedByUser, true);
+  assertEquals(gitlab[0].userCommentCount, 1);
+  assertEquals(gitlab[0].descriptionSnippet, "A gitlab description");
+
   assertEquals(jira[0].provider, "jira");
+  assertEquals(jira[0].bucket, "completed");
+  assertEquals(jira[0].isAssignedToUser, true);
+  assertEquals(jira[0].isCommentedByUser, true);
+
   assertEquals(github[0].provider, "github");
+  assertEquals(github[0].bucket, "completed");
+  assertEquals(github[0].isAssignedToUser, true);
   assertEquals(github[0].commentCount, 3);
 });
 
-Deno.test("buildReportSummary aggregates counts and labels", () => {
+Deno.test("buildReportSummary aggregates buckets and contribution counters", () => {
   const summary = buildReportSummary([
     {
       id: "a",
@@ -62,11 +78,19 @@ Deno.test("buildReportSummary aggregates counts and labels", () => {
       key: "GL-1",
       title: "A",
       state: "open",
+      bucket: "active",
       createdAt: "2026-02-01T00:00:00Z",
       updatedAt: "2026-02-01T00:00:00Z",
       assignees: [],
       labels: ["bug"],
       commentCount: 0,
+      contributedByUser: true,
+      isAuthoredByUser: true,
+      isAssignedToUser: false,
+      isCommentedByUser: false,
+      userCommentCount: 0,
+      impactScore: 20,
+      descriptionSnippet: "",
     },
     {
       id: "b",
@@ -75,43 +99,98 @@ Deno.test("buildReportSummary aggregates counts and labels", () => {
       key: "GH-2",
       title: "B",
       state: "closed",
+      bucket: "completed",
       createdAt: "2026-02-01T00:00:00Z",
       updatedAt: "2026-02-03T00:00:00Z",
       assignees: [],
-      labels: ["bug", "ops"],
-      commentCount: 0,
+      labels: ["p1", "ops"],
+      commentCount: 2,
+      contributedByUser: true,
+      isAuthoredByUser: false,
+      isAssignedToUser: true,
+      isCommentedByUser: true,
+      userCommentCount: 2,
+      impactScore: 65,
+      descriptionSnippet: "",
     },
   ]);
 
   assertEquals(summary.totalIssues, 2);
   assertEquals(summary.byProvider.gitlab, 1);
   assertEquals(summary.byProvider.github, 1);
-  assertEquals(summary.byState.open, 1);
+  assertEquals(summary.byBucket.active, 1);
+  assertEquals(summary.byBucket.completed, 1);
+  assertEquals(summary.contribution.contributedIssues, 2);
+  assertEquals(summary.contribution.totalUserComments, 2);
+  assertEquals(summary.highPriorityLabelIssues, 1);
   assertEquals(summary.topLabels[0].label, "bug");
-  assertEquals(summary.latestUpdated[0].key, "GH-2");
 });
 
-Deno.test("buildRunReport creates markdown with provider sections", () => {
-  const report = buildRunReport(
+Deno.test("buildRunReport applies deterministic impact scoring, ordering, and sections", async () => {
+  const report = await buildRunReport(
     {
       github: [{
         id: 3,
         number: 99,
         title: "GH issue",
+        state: "closed",
+        body: "Critical customer fix",
+        created_at: "2026-02-01T00:00:00Z",
+        updated_at: "2026-02-16T22:30:00Z",
+        user: { login: "mock.user" },
+        assignees: [{ login: "mock.user" }],
+        labels: [{ name: "p1" }, { name: "customer" }],
+        comments: 3,
+        notes: [
+          { id: 1, user: { login: "mock.user" } },
+          { id: 2, user: { login: "mock.user" } },
+          { id: 3, user: { login: "teammate" } },
+        ],
+      }, {
+        id: 4,
+        number: 100,
+        title: "Secondary",
         state: "open",
         created_at: "2026-02-01T00:00:00Z",
-        updated_at: "2026-02-04T00:00:00Z",
-        user: { login: "gh-user" },
+        updated_at: "2026-02-10T10:00:00Z",
+        user: { login: "teammate" },
+        assignees: [{ login: "teammate" }],
+        labels: [{ name: "maintenance" }],
+        comments: 0,
+        notes: [],
       }],
     },
     {
       startDate: "2026-02-01T00:00:00Z",
       endDate: "2026-02-16T23:59:59Z",
       fetchMode: "all_contributions",
+      reportProfile: "activity_retro",
+      reportFormat: "both",
+      aiNarrative: "off",
+      aiModel: "gpt-4o-mini",
+      usernames: {
+        github: "mock.user",
+      },
     },
   );
 
-  assertEquals(report.normalizedIssues.length, 1);
-  assertStringIncludes(report.markdown, "## By Provider");
-  assertStringIncludes(report.markdown, "GitHub");
+  assertEquals(report.normalizedIssues.length, 2);
+  assertEquals(report.normalizedIssues[0].key, "GH-99");
+
+  // completed (40) + authored (15) + assigned (10) + comments 2*2 (4) + high-impact label (12) + recent update (8)
+  assertEquals(report.normalizedIssues[0].impactScore, 89);
+  assertEquals(report.normalizedIssues[1].impactScore, 20);
+
+  assertStringIncludes(report.markdown, "## Top Activity Highlights");
+  assertStringIncludes(report.markdown, "## Collaboration Highlights");
+  assertStringIncludes(report.markdown, "## Risks and Follow-ups");
+  assertStringIncludes(report.markdown, "## Weekly Activity Talking Points");
+  assertStringIncludes(report.markdown, "## Appendix");
+
+  assertStringIncludes(report.html, "https://cdn.tailwindcss.com");
+  assertStringIncludes(report.html, "Top Activity Highlights");
+  assertStringIncludes(report.html, "Collaboration Highlights");
+  assertStringIncludes(report.html, "Risks and Follow-ups");
+  assertStringIncludes(report.html, "Weekly Activity Talking Points");
+  assertStringIncludes(report.html, "Appendix");
 });

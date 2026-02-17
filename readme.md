@@ -11,6 +11,14 @@ the author, assignee, or a participant.
 - **Flexible Config**: Use `.env`, command-line flags, or interactive prompts.
 - **Resilient Fetching**: Shared retry/backoff for transient API failures and
   rate limits.
+- **Activity Reports 2.0**: Deterministic scoring, attribution flags, and
+  profile-based highlights.
+- **Optional AI Narrative Rewrite**: OpenAI rewrite layer for wording only
+  (headline/highlights/talking points) with deterministic fallback.
+- **HTML Reports**: Real shadcn package renderer (React + shadcn components)
+  executed through `reporting/shadcn-renderer` (Vite SSR).
+- **Single Command UX**: report generation auto-installs/builds the Vite
+  renderer when needed, so `fetch`/`report` stay one command.
 - **Smart Filtering**:
   - `my_issues`: only issues you created or are assigned to.
   - `all_contributions`: includes issues where you commented/participated.
@@ -20,6 +28,7 @@ the author, assignee, or a participant.
 ### Prerequisites
 
 - [Deno](https://deno.com/)
+- [Node.js](https://nodejs.org/) 20+ and `npm` (for Vite/shadcn renderer)
 - A Personal Access Token (PAT) for GitLab, Jira, or GitHub.
 
 ### Setup
@@ -63,7 +72,7 @@ deno task test
 deno run main.ts help
 
 # offline run with local fixtures (no provider credentials required)
-deno run --allow-read --allow-env main.ts fetch --provider all --mock
+deno run --allow-read --allow-env --allow-run=npm main.ts fetch --provider all --mock
 ```
 
 ### Expected Outputs
@@ -74,8 +83,12 @@ deno run --allow-read --allow-env main.ts fetch --provider all --mock
 - `provider=all`: writes `output/gitlab_issues.json`, `output/jira_issues.json`,
   and `output/github_issues.json`.
 - Any successful run also writes report artifacts:
-  - `output/reports/<timestamp>-summary.md`
+  - `output/reports/<timestamp>-summary.html`
   - `output/reports/<timestamp>-normalized.json`
+
+On first HTML report run, the CLI may take longer while it automatically
+installs/builds the Vite renderer (`reporting/shadcn-renderer`). If Deno prompts
+for npm run permission, allow it so the shadcn renderer can run.
 
 ### Exit Codes
 
@@ -86,11 +99,9 @@ deno run --allow-read --allow-env main.ts fetch --provider all --mock
 In non-interactive environments (CI/scripts), the CLI exits immediately without
 waiting for an Enter key prompt.
 
-## Collaboration Docs
+## Renderer Docs
 
-- Repo workflow and acceptance standards: `CONTRIBUTING.md`
-- Agent and reviewer operating rules: `AGENTS.md`
-- System/module map: `ARCHITECTURE.md`
+- Vite + shadcn renderer flow: `docs/reporting-vite-shadcn.md`
 
 ## Quality Gates
 
@@ -165,6 +176,11 @@ You can override defaults or environment variables using flags:
 | `--githubPAT`      |           | GitHub Personal Access Token                                                                           | _Interactive_                |
 | `--githubURL`      |           | GitHub API URL (for Cloud or Enterprise)                                                               | _Interactive_                |
 | `--githubUsername` |           | GitHub username                                                                                        | _Interactive_                |
+| `--reportProfile`  |           | Report profile: `brief`, `activity_retro`, `showcase` (hard reject: `manager_retro`)                   | `activity_retro`             |
+| `--reportFormat`   |           | Report format preference (`markdown`, `html`, `both` accepted; HTML artifact is always generated)      | `html`                       |
+| `--aiNarrative`    |           | AI rewrite mode: `auto`, `on`, `off`                                                                   | `auto`                       |
+| `--aiModel`        |           | OpenAI model for narrative rewrite                                                                     | `gpt-4o-mini`                |
+| `--gitlabUsername` |           | GitLab username for deterministic attribution/scoring                                                  | `GITLAB_USERNAME` or empty   |
 | `--outFile`        | `--out`   | Output filename                                                                                        | `output/gitlab_issues.json`* |
 | `--timeRange`      | `--range` | `week`, `month`, `year`, `custom`                                                                      | `week`                       |
 | `--startDate`      | `--start` | Custom start date (`MM-DD-YYYY`), required for `custom`                                                | N/A                          |
@@ -195,10 +211,13 @@ deno run main.ts fetch --provider all --range week
 deno run main.ts fetch --provider github --githubURL https://api.github.com --githubUsername myuser --range week
 
 # Offline local run (uses fixtures/*.mock.json)
-deno run --allow-read --allow-env main.ts fetch --provider all --mock
+deno run --allow-read --allow-env --allow-run=npm main.ts fetch --provider all --mock
 
 # Generate report only (from existing issue json files)
 deno run main.ts report --provider all
+
+# Generate report with explicit format/profile/AI controls
+deno run main.ts report --provider all --reportProfile activity_retro --reportFormat html --aiNarrative auto
 ```
 
 ## Troubleshooting
@@ -215,6 +234,11 @@ deno run main.ts report --provider all
   - Widen `TIME_RANGE`.
   - Switch `FETCH_MODE` to `all_contributions`.
   - Confirm username (Jira) and account access to projects/issues.
+- HTML renderer bootstrap/build error:
+  - Ensure Node 20+ and npm are installed.
+  - Ensure Deno run permission includes npm (`--allow-run=npm` or `-A`).
+  - Retry once from repo root: `npm --prefix reporting/shadcn-renderer install`
+  - Then rerun your normal single command (`fetch` or `report`).
 
 ## Security Notes
 
@@ -226,3 +250,8 @@ deno run main.ts report --provider all
 
 The CLI writes raw provider issue data as JSON, including issue comments/notes
 used for contribution filtering.
+
+Report JSON output (`output/reports/*-normalized.json`) includes attribution and
+scoring fields used by Activity Reports 2.0: `bucket`, `contributedByUser`,
+`isAuthoredByUser`, `isAssignedToUser`, `isCommentedByUser`, `userCommentCount`,
+`impactScore`, and `descriptionSnippet`.

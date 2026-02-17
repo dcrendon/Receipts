@@ -1,5 +1,11 @@
 import { parseArgs } from "@std/cli";
-import { generateConfig, promptExit } from "./config/config.ts";
+import { generateConfig, loadEnvConfig, promptExit } from "./config/config.ts";
+import {
+  parseAiNarrativeMode,
+  parseAttributionUsername,
+  parseReportFormat,
+  parseReportProfile,
+} from "./config/report_options.ts";
 import { printCommandHelp, resolveCommand } from "./core/cli.ts";
 import {
   evaluateRunStatus,
@@ -84,13 +90,30 @@ const runFetch = async (args: string[], useTui: boolean) => {
   );
   if (successfulResults.length > 0) {
     try {
-      const report = buildRunReport(successfulIssues, {
+      const report = await buildRunReport(successfulIssues, {
         startDate,
         endDate,
         fetchMode: config.fetchMode,
+        reportProfile: config.reportProfile ?? "activity_retro",
+        reportFormat: config.reportFormat ?? "html",
+        aiNarrative: config.aiNarrative ?? "auto",
+        aiModel: config.aiModel ?? "gpt-4o-mini",
+        openaiApiKey: config.openaiApiKey,
+        usernames: {
+          gitlab: config.gitlabUsername,
+          jira: config.jiraUsername,
+          github: config.githubUsername,
+        },
       });
-      const { markdownPath, normalizedPath } = await writeRunReport(report);
-      console.log(`\nSummary report written to ${markdownPath}`);
+      const { markdownPath, htmlPath, normalizedPath } = await writeRunReport(
+        report,
+      );
+      if (markdownPath) {
+        console.log(`\nSummary report written to ${markdownPath}`);
+      }
+      if (htmlPath) {
+        console.log(`Summary HTML report written to ${htmlPath}`);
+      }
       console.log(`Normalized issues written to ${normalizedPath}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -142,6 +165,14 @@ const readIssuesFromCandidates = async (
 };
 
 const runReportCommand = async (args: string[]) => {
+  let envConfig: Partial<Config> = {};
+  try {
+    envConfig = await loadEnvConfig();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    promptExit(message, 1);
+  }
+
   const parsed = parseArgs(args, {
     string: [
       "provider",
@@ -151,6 +182,13 @@ const runReportCommand = async (args: string[]) => {
       "startDate",
       "endDate",
       "fetchMode",
+      "gitlabUsername",
+      "jiraUsername",
+      "githubUsername",
+      "reportProfile",
+      "reportFormat",
+      "aiNarrative",
+      "aiModel",
     ],
     alias: {
       provider: "p",
@@ -191,13 +229,63 @@ const runReportCommand = async (args: string[]) => {
     );
   }
 
-  const report = buildRunReport(providerIssues, {
+  let reportProfile: NonNullable<Config["reportProfile"]> = "activity_retro";
+  let reportFormat: NonNullable<Config["reportFormat"]> = "html";
+  let aiNarrative: NonNullable<Config["aiNarrative"]> = "auto";
+  let aiModel: string = "gpt-4o-mini";
+  let gitlabUsername: string | undefined;
+  let jiraUsername: string | undefined;
+  let githubUsername: string | undefined;
+
+  try {
+    reportProfile = parseReportProfile(
+      parsed.reportProfile ?? envConfig.reportProfile,
+    ) ?? "activity_retro";
+    reportFormat =
+      parseReportFormat(parsed.reportFormat ?? envConfig.reportFormat) ??
+        "html";
+    aiNarrative =
+      parseAiNarrativeMode(parsed.aiNarrative ?? envConfig.aiNarrative) ??
+        "auto";
+    aiModel = (parsed.aiModel ?? envConfig.aiModel ?? "gpt-4o-mini").trim();
+    gitlabUsername = parseAttributionUsername(
+      parsed.gitlabUsername ?? envConfig.gitlabUsername,
+    );
+    jiraUsername = parseAttributionUsername(
+      parsed.jiraUsername ?? envConfig.jiraUsername,
+    );
+    githubUsername = parseAttributionUsername(
+      parsed.githubUsername ?? envConfig.githubUsername,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    promptExit(message, 1);
+  }
+
+  const report = await buildRunReport(providerIssues, {
     startDate: parsed.startDate ?? "unknown",
     endDate: parsed.endDate ?? "unknown",
     fetchMode: parsed.fetchMode ?? "all_contributions",
+    reportProfile,
+    reportFormat,
+    aiNarrative,
+    aiModel,
+    openaiApiKey: envConfig.openaiApiKey,
+    usernames: {
+      gitlab: gitlabUsername,
+      jira: jiraUsername,
+      github: githubUsername,
+    },
   });
-  const { markdownPath, normalizedPath } = await writeRunReport(report);
-  console.log(`\nSummary report written to ${markdownPath}`);
+  const { markdownPath, htmlPath, normalizedPath } = await writeRunReport(
+    report,
+  );
+  if (markdownPath) {
+    console.log(`\nSummary report written to ${markdownPath}`);
+  }
+  if (htmlPath) {
+    console.log(`Summary HTML report written to ${htmlPath}`);
+  }
   console.log(`Normalized issues written to ${normalizedPath}`);
   promptExit("Report generation completed successfully.", 0);
 };

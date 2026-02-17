@@ -163,12 +163,18 @@ export const runConfigWizard = async (
     mockDataDir,
     gitlabPAT: seed.gitlabPAT,
     gitlabURL: seed.gitlabURL,
+    gitlabUsername: seed.gitlabUsername,
     jiraPAT: seed.jiraPAT,
     jiraURL: seed.jiraURL,
     jiraUsername: seed.jiraUsername,
     githubPAT: seed.githubPAT,
     githubURL: seed.githubURL,
     githubUsername: seed.githubUsername,
+    reportProfile: seed.reportProfile ?? "activity_retro",
+    reportFormat: seed.reportFormat ?? "both",
+    aiNarrative: seed.aiNarrative ?? "auto",
+    aiModel: seed.aiModel ?? "gpt-4o-mini",
+    openaiApiKey: seed.openaiApiKey,
   };
 
   if (!useMockData) {

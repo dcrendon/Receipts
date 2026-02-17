@@ -1,12 +1,22 @@
+export type ReportProfile = "brief" | "activity_retro" | "showcase";
+export type ReportFormat = "markdown" | "html" | "both";
+export type AiNarrativeMode = "auto" | "on" | "off";
+
 export interface Config {
   gitlabPAT?: string;
   gitlabURL?: string;
+  gitlabUsername?: string;
   jiraPAT?: string;
   jiraURL?: string;
   jiraUsername?: string;
   githubPAT?: string;
   githubURL?: string;
   githubUsername?: string;
+  reportProfile?: ReportProfile;
+  reportFormat?: ReportFormat;
+  aiNarrative?: AiNarrativeMode;
+  aiModel?: string;
+  openaiApiKey?: string;
   useMockData: boolean;
   mockDataDir?: string;
   outFile: string;
