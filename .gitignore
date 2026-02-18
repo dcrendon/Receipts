@@ -2,6 +2,7 @@
 .DS_Store
 output/
 reports/
+fixtures/
 gitlab_issues.json
 jira_issues.json
 github_issues.json
