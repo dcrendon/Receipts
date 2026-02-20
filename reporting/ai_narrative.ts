@@ -66,7 +66,7 @@ const OPENAI_CHAT_COMPLETIONS_URL =
   "https://api.openai.com/v1/chat/completions";
 
 const REWRITE_SYSTEM_PROMPT =
-  "You rewrite one status-report narrative line. Rewrite wording only. Preserve factual meaning exactly. Do not add new facts, counts, dates, issue keys, providers, or states. Return plain text only with no JSON, no markdown, and no bullet prefix.";
+  "You rewrite one status-report narrative line. Rewrite wording only. Preserve factual meaning exactly. Do not add new facts, counts, dates, issue keys, providers, or states. Keep issue references concrete and avoid vague filler (for example: demonstrates, shows, represents). Return plain text only with no JSON, no markdown, and no bullet prefix.";
 
 const truncateSnippet = (value: string): string => {
   const cleaned = value.replace(/\s+/g, " ").trim();
@@ -146,6 +146,7 @@ const buildRewritePrompt = (
       "Rewrite wording only.",
       "Keep factual meaning unchanged.",
       "Do not add/remove issue references, counts, dates, or state facts.",
+      "Avoid vague filler phrasing and keep the sentence tied to concrete ticket work.",
       "Keep output concise and executive-friendly.",
       "Return plain text only.",
     ],

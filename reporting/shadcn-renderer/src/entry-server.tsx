@@ -192,9 +192,9 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
           <section id="summary">
             <Card>
               <CardHeader>
-                <CardTitle>Ticket Summary (AI)</CardTitle>
+                <CardTitle>Ticket Summary</CardTitle>
                 <CardDescription>
-                  Focused summary for the selected reporting period.
+                  Summary grounded in ticket activity for this reporting period.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -228,6 +228,8 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
                             </span>{" "}
                             <span className="text-muted-foreground">({PROVIDER_LABEL[issue.provider]})</span>
                             {": "}
+                            <span className="font-medium">{issue.title}</span>
+                            {" - "}
                             {wording}
                           </li>
                         );

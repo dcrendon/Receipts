@@ -841,20 +841,90 @@ export const buildReportSummary = (
   };
 };
 
+const firstSentenceFromSnippet = (value: string): string => {
+  const snippet = value.replace(/\s+/g, " ").trim();
+  if (!snippet) return "";
+  const first = snippet.split(/[.!?]/)[0]?.trim() ?? "";
+  return first;
+};
+
+const summarizeContributionSignals = (issue: ReportIssueView): string => {
+  const modes = [
+    issue.isAuthoredByUser ? "authored" : null,
+    issue.isAssignedToUser ? "assigned" : null,
+    issue.isCommentedByUser ? `commented (${issue.userCommentCount})` : null,
+  ].filter(Boolean);
+
+  return modes.length ? modes.join(", ") : "tracked";
+};
+
 const highlightNarrativeFallback = (issue: ReportIssueView): string => {
+  const snippet = firstSentenceFromSnippet(issue.descriptionSnippet);
+  const snippetClause = snippet ? ` Work detail: ${snippet}.` : "";
+  const contribution = summarizeContributionSignals(issue);
+
   if (issue.bucket === "completed") {
-    return "Closed with high delivery confidence and clear ownership evidence.";
+    return `${issue.key} (${issue.title}) reached ${issue.state}; user ${contribution}; impact ${issue.impactScore}.${snippetClause}`;
   }
 
   if (issue.bucket === "blocked") {
-    return "Requires follow-up to unblock delivery risk and preserve timeline.";
+    return `${issue.key} (${issue.title}) is blocked in ${issue.state}; requires unblock follow-up; user ${contribution}; impact ${issue.impactScore}.${snippetClause}`;
   }
 
-  if (issue.isCommentedByUser || issue.isAssignedToUser) {
-    return "Shows direct collaboration and active execution touchpoints.";
+  if (issue.bucket === "active") {
+    return `${issue.key} (${issue.title}) is in progress (${issue.state}); user ${contribution}; impact ${issue.impactScore}.${snippetClause}`;
   }
 
-  return "Represents ongoing activity with measurable impact signals.";
+  return `${issue.key} (${issue.title}) remains in ${issue.state}; user ${contribution}; impact ${issue.impactScore}.${snippetClause}`;
+};
+
+const buildHeadlineLead = (
+  summary: ReportSummary,
+  context: ReportContext,
+): string => {
+  if (summary.totalIssues === 0) {
+    return "No ticket activity was captured in the selected reporting window.";
+  }
+
+  const completed = summary.topActivityHighlights.find((issue) =>
+    issue.bucket === "completed"
+  );
+  const active = summary.topActivityHighlights.find((issue) =>
+    issue.bucket === "active"
+  );
+  const blocked = summary.risksAndFollowUps[0];
+
+  const statements: string[] = [];
+  if (completed) {
+    statements.push(
+      `Completed ${completed.key} (${completed.title}) with state ${completed.state}.`,
+    );
+  }
+  if (active) {
+    statements.push(
+      `Advanced ${active.key} (${active.title}) in ${active.state}.`,
+    );
+  }
+  if (blocked) {
+    statements.push(
+      `Blocker remains on ${blocked.key} (${blocked.title}) and needs follow-up.`,
+    );
+  }
+
+  if (!statements.length) {
+    const top = summary.topActivityHighlights[0] ?? summary.latestUpdated[0];
+    if (top) {
+      statements.push(
+        `Primary tracked ticket was ${top.key} (${top.title}) in ${top.state}.`,
+      );
+    }
+  }
+
+  if (context.reportProfile === "showcase") {
+    statements.unshift("This window highlights concrete ticket outcomes.");
+  }
+
+  return statements.join(" ");
 };
 
 const buildDeterministicNarrative = (
@@ -876,11 +946,7 @@ const buildDeterministicNarrative = (
     summary.byProvider.github,
   ].filter((count) => count > 0).length;
 
-  const headlineLead = context.reportProfile === "brief"
-    ? "Focused activity snapshot for the selected reporting window."
-    : context.reportProfile === "showcase"
-    ? "Impact showcase emphasizing execution momentum and collaboration."
-    : "Activity retro emphasizing completed work, active flow, and next risks.";
+  const headlineLead = buildHeadlineLead(summary, context);
 
   const headlineFacts = summary.totalIssues === 0
     ? `No issues found across ${providerCount} connected provider${
