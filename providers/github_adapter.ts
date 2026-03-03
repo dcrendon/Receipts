@@ -47,7 +47,6 @@ export class GitHubAdapter implements ProviderAdapter {
       config.githubUsername,
       dateWindow.startDate,
       dateWindow.endDate,
-      "all_contributions",
     );
   }
 }

@@ -77,43 +77,16 @@ const fetchProjectIssues = async (
   projectID: number,
   gitlabURL: string,
   headers: Record<string, string>,
-  userID: number,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ): Promise<GitlabIssue[]> => {
   const projectURL = `${gitlabURL}/api/v4/projects/${projectID}/issues`;
 
-  if (fetchMode === "my_issues") {
-    const baseParams = {
-      scope: "all",
-      created_after: startDate,
-      created_before: endDate,
-    };
-
-    const [assignedIssues, createdIssues] = await Promise.all([
-      getPaginatedResults<GitlabIssue>(projectURL, headers, {
-        ...baseParams,
-        assignee_id: userID,
-      }),
-      getPaginatedResults<GitlabIssue>(projectURL, headers, {
-        ...baseParams,
-        author_id: userID,
-      }),
-    ]);
-
-    return [...assignedIssues, ...createdIssues];
-  }
-
-  if (fetchMode === "all_contributions") {
-    return await getPaginatedResults<GitlabIssue>(projectURL, headers, {
-      scope: "all",
-      updated_after: startDate,
-      updated_before: endDate,
-    });
-  }
-
-  throw new Error(`Invalid fetch mode: ${fetchMode}`);
+  return await getPaginatedResults<GitlabIssue>(projectURL, headers, {
+    scope: "all",
+    updated_after: startDate,
+    updated_before: endDate,
+  });
 };
 
 const getIssues = async (
@@ -123,7 +96,6 @@ const getIssues = async (
   userID: number,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ) => {
   const issuesToProcess = new Map<number, GitlabIssue>();
 
@@ -132,10 +104,8 @@ const getIssues = async (
       project.id,
       gitlabURL,
       headers,
-      userID,
       startDate,
       endDate,
-      fetchMode,
     );
     addUniqueIssues(issuesToProcess, projectIssues);
   }
@@ -158,13 +128,7 @@ const filterNotes = async (
   gitlabURL: string,
   headers: Record<string, string>,
   userID: number,
-  fetchMode: string,
 ) => {
-  const includeAllFetchedIssues = fetchMode === "my_issues";
-  if (!includeAllFetchedIssues && fetchMode !== "all_contributions") {
-    throw new Error(`Invalid fetch mode: ${fetchMode}`);
-  }
-
   const finalIssues: GitlabIssue[] = [];
 
   for (const issue of issues.values()) {
@@ -176,7 +140,7 @@ const filterNotes = async (
     });
 
     issue.notes = notes;
-    if (includeAllFetchedIssues || isContributor(issue, notes, userID)) {
+    if (isContributor(issue, notes, userID)) {
       finalIssues.push(issue);
     }
   }
@@ -189,7 +153,6 @@ export const gitlabIssues = async (
   headers: Record<string, string>,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ) => {
   const userID = await getUserID(gitlabURL, headers);
   const projects = await getProjects(gitlabURL, headers, userID);
@@ -201,7 +164,6 @@ export const gitlabIssues = async (
     userID,
     startDate,
     endDate,
-    fetchMode,
   );
 
   if (!issuesToProcess.size) {
@@ -213,6 +175,5 @@ export const gitlabIssues = async (
     gitlabURL,
     headers,
     userID,
-    fetchMode,
   );
 };

@@ -87,11 +87,13 @@ const askRequiredSecret = (question: string, defaultValue?: string): string => {
   }
 };
 
-const getWizardTotalSteps = (hasApiKey: boolean): number =>
-  hasApiKey ? 3 : 2;
+const getWizardTotalSteps = (hasApiKey: boolean): number => hasApiKey ? 3 : 2;
 
-const formatWizardStep = (step: number, totalSteps: number, label: string): string =>
-  `Step ${step}/${totalSteps} - ${label}`;
+const formatWizardStep = (
+  step: number,
+  totalSteps: number,
+  label: string,
+): string => `Step ${step}/${totalSteps} - ${label}`;
 
 const formatMissingFields = (fields: (keyof Config)[]): string =>
   fields.map(describeProviderField).join(", ");
@@ -231,7 +233,9 @@ export const runConfigWizard = (
     aiModel,
   };
 
-  console.log(formatWizardStep(step, totalSteps, "Review provider credentials"));
+  console.log(
+    formatWizardStep(step, totalSteps, "Review provider credentials"),
+  );
 
   const targetProviders: ProviderName[] = ["gitlab", "jira", "github"];
 

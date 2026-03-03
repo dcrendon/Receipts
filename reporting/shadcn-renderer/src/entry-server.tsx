@@ -132,10 +132,14 @@ function formatHumanDate(value: string): string {
 
 function statusBadgeClass(bucket: ActivityBucket): string {
   const map: Record<ActivityBucket, string> = {
-    completed: "border-emerald-600/40 bg-emerald-500/15 text-emerald-700 dark:border-emerald-300/35 dark:bg-emerald-500/15 dark:text-emerald-200",
-    active: "border-sky-600/40 bg-sky-500/15 text-sky-700 dark:border-sky-300/35 dark:bg-sky-500/15 dark:text-sky-200",
-    blocked: "border-amber-600/40 bg-amber-500/15 text-amber-700 dark:border-amber-300/35 dark:bg-amber-500/15 dark:text-amber-200",
-    other: "border-slate-400/40 bg-slate-500/10 text-slate-600 dark:border-slate-300/35 dark:bg-slate-500/15 dark:text-slate-200",
+    completed:
+      "border-emerald-600/40 bg-emerald-500/15 text-emerald-700 dark:border-emerald-300/35 dark:bg-emerald-500/15 dark:text-emerald-200",
+    active:
+      "border-sky-600/40 bg-sky-500/15 text-sky-700 dark:border-sky-300/35 dark:bg-sky-500/15 dark:text-sky-200",
+    blocked:
+      "border-amber-600/40 bg-amber-500/15 text-amber-700 dark:border-amber-300/35 dark:bg-amber-500/15 dark:text-amber-200",
+    other:
+      "border-slate-400/40 bg-slate-500/10 text-slate-600 dark:border-slate-300/35 dark:bg-slate-500/15 dark:text-slate-200",
   };
   return map[bucket];
 }
@@ -160,7 +164,9 @@ function KpiGrid({ summary }: { summary: ReportSummary }) {
       {items.map((item) => (
         <Card key={item.label} className="bg-card/80">
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {item.label}
+            </p>
             <p className="mt-1 text-2xl font-bold tabular-nums">{item.value}</p>
           </CardContent>
         </Card>
@@ -205,7 +211,9 @@ function CoverageFooter({ coverage }: { coverage: ReportCoverageSummary }) {
     <Card className="bg-card/60">
       <CardContent className="flex flex-wrap items-center gap-4 p-4 text-xs text-muted-foreground">
         <span>
-          Providers: {coverage.connectedProviderCount}/{coverage.totalProviderCount} connected
+          Providers:{" "}
+          {coverage.connectedProviderCount}/{coverage.totalProviderCount}{" "}
+          connected
         </span>
         {coverage.failedProviders.length > 0 && (
           <span className="text-destructive">
@@ -223,10 +231,22 @@ function CoverageFooter({ coverage }: { coverage: ReportCoverageSummary }) {
 /* ------------------------------------------------------------------ */
 
 function ReportDocument({ payload }: { payload: RenderPayload }) {
-  const { summary, headline, aiAssisted, context, normalizedIssues, coverage, providerDistribution } = payload;
+  const {
+    summary,
+    headline,
+    aiAssisted,
+    context,
+    normalizedIssues,
+    coverage,
+    providerDistribution,
+  } = payload;
 
-  const windowLabel = `${formatHumanDate(context.startDate)} \u2192 ${formatHumanDate(context.endDate)}`;
-  const generatedAt = formatHumanDateTime(context.generatedAt ?? new Date().toISOString());
+  const windowLabel = `${formatHumanDate(context.startDate)} \u2192 ${
+    formatHumanDate(context.endDate)
+  }`;
+  const generatedAt = formatHumanDateTime(
+    context.generatedAt ?? new Date().toISOString(),
+  );
 
   return (
     <html lang="en">
@@ -238,11 +258,12 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <main className="mx-auto w-full max-w-[1180px] space-y-4 p-4 md:p-6">
-
           {/* ---- Header ---- */}
           <Card className="bg-card/90">
             <CardHeader>
-              <CardTitle className="text-3xl tracking-tight">Activity Report</CardTitle>
+              <CardTitle className="text-3xl tracking-tight">
+                Activity Report
+              </CardTitle>
               <CardDescription className="mt-1 text-xs">
                 {windowLabel} &middot; Generated {generatedAt}
               </CardDescription>
@@ -253,7 +274,10 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
               </p>
               {aiAssisted && (
                 <p className="mt-1">
-                  <Badge variant="outline" className="text-[10px] border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                  >
                     AI-assisted
                   </Badge>
                 </p>
@@ -278,7 +302,9 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
             <Card>
               <CardHeader>
                 <CardTitle>All Issues</CardTitle>
-                <CardDescription>Complete list of issues for this reporting window.</CardDescription>
+                <CardDescription>
+                  Complete list of issues for this reporting window.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto rounded-lg border border-border bg-card/70">
@@ -293,47 +319,63 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {normalizedIssues.length ? (
-                        normalizedIssues.map((issue, index) => (
-                          <TableRow key={`${issue.provider}-${issue.key}-${index}`}>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {index + 1}
-                            </TableCell>
-                            <TableCell>
-                              {issue.url ? (
-                                <a
-                                  href={issue.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium underline-offset-4 hover:underline"
+                      {normalizedIssues.length
+                        ? (
+                          normalizedIssues.map((issue, index) => (
+                            <TableRow
+                              key={`${issue.provider}-${issue.key}-${index}`}
+                            >
+                              <TableCell className="font-mono text-xs text-muted-foreground">
+                                {index + 1}
+                              </TableCell>
+                              <TableCell>
+                                {issue.url
+                                  ? (
+                                    <a
+                                      href={issue.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="font-medium underline-offset-4 hover:underline"
+                                    >
+                                      {issue.title}
+                                    </a>
+                                  )
+                                  : (
+                                    <span className="font-medium">
+                                      {issue.title}
+                                    </span>
+                                  )}
+                                <span className="ml-2 text-xs text-muted-foreground font-mono">
+                                  {issue.key}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                                {issue.descriptionSnippet || "\u2014"}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {PROVIDER_LABEL[issue.provider]}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={statusBadgeClass(issue.bucket)}
+                                  variant="outline"
                                 >
-                                  {issue.title}
-                                </a>
-                              ) : (
-                                <span className="font-medium">{issue.title}</span>
-                              )}
-                              <span className="ml-2 text-xs text-muted-foreground font-mono">
-                                {issue.key}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                              {issue.descriptionSnippet || "\u2014"}
-                            </TableCell>
-                            <TableCell className="text-xs">{PROVIDER_LABEL[issue.provider]}</TableCell>
-                            <TableCell>
-                              <Badge className={statusBadgeClass(issue.bucket)} variant="outline">
-                                {BUCKET_LABEL[issue.bucket]}
-                              </Badge>
+                                  {BUCKET_LABEL[issue.bucket]}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )
+                        : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={5}
+                              className="text-sm text-muted-foreground"
+                            >
+                              No tickets available for this window.
                             </TableCell>
                           </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-sm text-muted-foreground">
-                            No tickets available for this window.
-                          </TableCell>
-                        </TableRow>
-                      )}
+                        )}
                     </TableBody>
                   </Table>
                 </div>
@@ -345,7 +387,6 @@ function ReportDocument({ payload }: { payload: RenderPayload }) {
           <section id="coverage">
             <CoverageFooter coverage={coverage} />
           </section>
-
         </main>
       </body>
     </html>

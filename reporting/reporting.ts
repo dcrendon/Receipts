@@ -647,7 +647,9 @@ const buildHeadlineLead = (
 
   if (summary.byBucket.completed > 0) {
     parts.push(
-      `Completed ${summary.byBucket.completed} item${summary.byBucket.completed > 1 ? "s" : ""}`,
+      `Completed ${summary.byBucket.completed} item${
+        summary.byBucket.completed > 1 ? "s" : ""
+      }`,
     );
   }
 
@@ -660,7 +662,9 @@ const buildHeadlineLead = (
   }
 
   if (!parts.length) {
-    return `${summary.totalIssues} issue${summary.totalIssues > 1 ? "s" : ""} tracked this window.`;
+    return `${summary.totalIssues} issue${
+      summary.totalIssues > 1 ? "s" : ""
+    } tracked this window.`;
   }
 
   return parts.join(", ") + ".";
@@ -1003,7 +1007,9 @@ export const buildRunReport = async (
 const formatFilenameDate = (isoDate: string): string => {
   const d = new Date(isoDate);
   if (isNaN(d.getTime())) return "unknown";
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${
+    String(d.getUTCMonth() + 1).padStart(2, "0")
+  }-${String(d.getUTCDate()).padStart(2, "0")}`;
 };
 
 const buildOutputFileBase = (report: RunReport): string => {

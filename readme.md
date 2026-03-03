@@ -1,32 +1,19 @@
-# GitLab, Jira & GitHub Issue Fetcher
+# Issue Tracker Report
 
-A Deno terminal app that fetches issues from GitLab, Jira, and GitHub and
-produces JSON + report artifacts.
+A Deno CLI that fetches issues from GitLab, Jira, and GitHub and generates an
+HTML summary report.
 
-## What changed
+## What it does
 
-- Runtime config is now `.env + TUI` only.
-- CLI flags and subcommands were removed.
-- App entrypoint is always:
-
-```bash
-deno run main.ts
-```
-
-- In interactive terminals, the TUI wizard runs.
-- In non-interactive environments (CI/scripts), the app runs headless from
-  `.env` values only.
-
-## Provider readiness
-
-A provider is runnable only when all required credentials are available.
-
-- GitLab: `GITLAB_PAT` + `GITLAB_URL`
-- Jira: `JIRA_PAT` + `JIRA_URL` + `JIRA_USERNAME`
-- GitHub: `GITHUB_PAT` + `GITHUB_URL` + `GITHUB_USERNAME`
-
-If a provider is missing required fields, it is skipped. The run fails only when
-no selected provider is runnable.
+1. Fetches all issues you contributed to across configured providers.
+2. Normalizes issues into a common format with attribution and impact scoring.
+3. Generates a single-page HTML report with:
+   - **KPI summary** — completed, active, and blocked issue counts with provider
+     breakdown.
+   - **Full issue table** — every issue listed with title, description, status,
+     and a link back to the source system.
+4. Optionally rewrites the executive headline using OpenAI (when
+   `OPENAI_API_KEY` is set). Falls back gracefully when the key is missing.
 
 ## Setup
 
@@ -36,52 +23,59 @@ cd gitlab-issues
 cp .env.example .env
 ```
 
-Edit `.env` with provider credentials and optional runtime settings.
+Edit `.env` with your provider credentials.
+
+## Provider credentials
+
+A provider runs only when **all** required fields are present:
+
+| Provider | Required fields                               |
+| -------- | --------------------------------------------- |
+| GitLab   | `GITLAB_PAT`, `GITLAB_URL`                    |
+| Jira     | `JIRA_PAT`, `JIRA_URL`, `JIRA_USERNAME`       |
+| GitHub   | `GITHUB_PAT`, `GITHUB_URL`, `GITHUB_USERNAME` |
+
+Missing providers are skipped. The run fails only when no selected provider is
+runnable.
 
 ## Usage
 
 ```bash
-# Interactive (TTY): launches TUI wizard
+# Interactive (TTY) — launches a short config wizard
 deno run main.ts
 
-# Headless (non-TTY): reads .env only
-# example:
+# Headless (non-TTY) — reads .env only
 cat /dev/null | deno run main.ts
 ```
 
-## TUI behavior
+The wizard lets you pick:
 
-The wizard lets you configure:
-
-- provider scope (`gitlab`, `jira`, `github`, `all`)
-- time range and fetch mode
-- report profile/format/AI narrative mode
-- missing provider credentials (optional prompt to enter now)
-
-After prompts, the wizard prints provider readiness and runs only ready
-providers.
+- Time range (week / month / year / custom)
+- AI model (only when `OPENAI_API_KEY` is set)
 
 ## Outputs
 
-- Provider JSON files in `output/` (`gitlab_issues.json`, `jira_issues.json`,
-  `github_issues.json`, depending on runnable providers)
-- Report artifacts in `output/reports/`
+- `output/<provider>_issues.json` — raw fetched issues per provider.
+- `output/reports/<date-range>_<providers>-summary.html` — the HTML report.
+- `output/reports/<date-range>_<providers>-normalized.json` — normalized issues.
 
 ## Exit codes
 
-- `0`: all runnable providers succeeded
-- `1`: no runnable providers, or all runnable providers failed
-- `2`: partial success across runnable providers
+| Code | Meaning                                        |
+| ---- | ---------------------------------------------- |
+| 0    | All runnable providers succeeded               |
+| 1    | No runnable providers, or all providers failed |
+| 2    | Partial success (some providers failed)        |
 
-## Development commands
+## Development
 
 ```bash
-deno task dev
-deno task fmt
-deno task test
+deno task dev    # watch mode
+deno task fmt    # format
+deno task test   # run tests
 ```
 
-## Security notes
+## Security
 
 - Never commit `.env` or tokens.
-- Keep credentials in local `.env`.
+- Keep credentials in your local `.env` file.

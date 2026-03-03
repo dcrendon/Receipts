@@ -101,28 +101,15 @@ const removeNulls = (obj: unknown): unknown => {
   return obj;
 };
 
-const buildQueries = (
+const buildQuery = (
   username: string,
   startDate: string,
   endDate: string,
-  fetchMode: string,
-): string[] => {
+): string => {
   const safeUser = escapeGitHubValue(username);
   const from = isoDateOnly(startDate);
   const to = isoDateOnly(endDate);
-
-  if (fetchMode === "my_issues") {
-    return [
-      `type:issue author:${safeUser} created:${from}..${to}`,
-      `type:issue assignee:${safeUser} created:${from}..${to}`,
-    ];
-  }
-
-  if (fetchMode === "all_contributions") {
-    return [`type:issue involves:${safeUser} updated:${from}..${to}`];
-  }
-
-  throw new Error(`Invalid fetch mode: ${fetchMode}`);
+  return `type:issue involves:${safeUser} updated:${from}..${to}`;
 };
 
 const dedupeIssues = (issues: GitHubIssue[]): GitHubIssue[] => {
@@ -170,17 +157,11 @@ export const githubIssues = async (
   username: string,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ) => {
-  const queries = buildQueries(username, startDate, endDate, fetchMode);
+  const query = buildQuery(username, startDate, endDate);
+  const rawIssues = await getPaginatedSearchResults(githubURL, headers, query);
+  const issues = dedupeIssues(rawIssues);
 
-  const results = await Promise.all(
-    queries.map((query) =>
-      getPaginatedSearchResults(githubURL, headers, query)
-    ),
-  );
-
-  const issues = dedupeIssues(results.flat());
   if (!issues.length) {
     return [];
   }

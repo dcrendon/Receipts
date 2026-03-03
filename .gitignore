@@ -6,6 +6,9 @@
 # OS files
 .DS_Store
 
+# Claude Code local config
+.claude/
+
 # Generated outputs
 output/
 reports/

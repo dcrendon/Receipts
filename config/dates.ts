@@ -10,6 +10,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
+
 import { promptExit } from "./config.ts";
 import { Config } from "../shared/types.ts";
 
@@ -80,27 +81,4 @@ Date Range:
   To:   ${endDate}`);
 
   return { startDate, endDate };
-};
-
-export const getPreviousDateRange = (
-  current: { startDate: string; endDate: string },
-): { startDate: string; endDate: string } => {
-  const currentStart = Date.parse(current.startDate);
-  const currentEnd = Date.parse(current.endDate);
-
-  if (!Number.isFinite(currentStart) || !Number.isFinite(currentEnd)) {
-    return {
-      startDate: current.startDate,
-      endDate: current.endDate,
-    };
-  }
-
-  const windowDurationMs = Math.max(0, currentEnd - currentStart);
-  const previousEndMs = currentStart - 1;
-  const previousStartMs = previousEndMs - windowDurationMs;
-
-  return {
-    startDate: formatISO(new Date(previousStartMs)),
-    endDate: formatISO(new Date(previousEndMs)),
-  };
 };

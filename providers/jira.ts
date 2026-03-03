@@ -78,21 +78,11 @@ const buildJql = (
   username: string,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ): string => {
   const safeUser = escapeJQL(username);
   const from = isoDateOnly(startDate);
   const to = isoDateOnly(endDate);
-
-  if (fetchMode === "my_issues") {
-    return `(assignee = "${safeUser}" OR reporter = "${safeUser}") AND created >= "${from}" AND created <= "${to}"`;
-  }
-
-  if (fetchMode === "all_contributions") {
-    return `(assignee = "${safeUser}" OR reporter = "${safeUser}" OR watcher = "${safeUser}") AND updated >= "${from}" AND updated <= "${to}"`;
-  }
-
-  throw new Error(`Invalid fetch mode: ${fetchMode}`);
+  return `(assignee = "${safeUser}" OR reporter = "${safeUser}" OR watcher = "${safeUser}") AND updated >= "${from}" AND updated <= "${to}"`;
 };
 
 const matchesUser = (user: unknown, username: string): boolean => {
@@ -145,22 +135,20 @@ export const jiraIssues = async (
   username: string,
   startDate: string,
   endDate: string,
-  fetchMode: string,
 ) => {
-  const jql = buildJql(username, startDate, endDate, fetchMode);
+  const jql = buildJql(username, startDate, endDate);
 
   const issues = await getPaginatedResults(jiraURL, headers, jql);
 
   if (!issues.length) return [];
 
-  const includeAllFetchedIssues = fetchMode === "my_issues";
   const finalIssues: JiraIssue[] = [];
 
   for (const issue of issues) {
     const comments = await getIssueComments(jiraURL, headers, issue.key);
     issue.notes = comments;
 
-    if (includeAllFetchedIssues || isContributor(issue, comments, username)) {
+    if (isContributor(issue, comments, username)) {
       finalIssues.push(issue);
     }
   }

@@ -68,7 +68,6 @@ Deno.test("jiraIssues returns filtered contribution issues with comments", async
       "my.user",
       "2026-02-01T00:00:00.000Z",
       "2026-02-16T23:59:59.999Z",
-      "all_contributions",
     );
 
     assertEquals(issues.length, 2);
@@ -105,7 +104,6 @@ Deno.test("jiraIssues throws when search request fails", async () => {
           "my.user",
           "2026-02-01T00:00:00.000Z",
           "2026-02-16T23:59:59.999Z",
-          "my_issues",
         ),
     );
   } finally {

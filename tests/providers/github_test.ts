@@ -77,7 +77,6 @@ Deno.test("githubIssues enriches issues with comments and metadata", async () =>
       "mock.user",
       "2026-02-01T00:00:00.000Z",
       "2026-02-16T23:59:59.999Z",
-      "all_contributions",
     );
 
     assertEquals(issues.length, 1);
