@@ -1,6 +1,6 @@
-# gitlab-issues
+# Receipts
 
-A Deno CLI that fetches issue activity from GitLab, Jira, and GitHub, then generates a self-contained HTML activity report powered by Google Gemini.
+A Deno CLI that aggregates your issue activity across GitLab, Jira, and GitHub, then generates a self-contained HTML report with an AI narrative — so your standup actually reflects everything you shipped.
 
 ## What it does
 
