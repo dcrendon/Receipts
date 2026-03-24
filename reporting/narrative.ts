@@ -102,9 +102,6 @@ export const generateNarrative = async (
           parts: [{ text: buildPrompt(items, summary, context) }],
         },
       ],
-      generationConfig: {
-        maxOutputTokens: 1024,
-      },
     }),
   });
 
