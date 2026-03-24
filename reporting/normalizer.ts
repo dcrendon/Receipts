@@ -173,7 +173,7 @@ const bucketFromState = (state: string): ActivityBucket => {
   const normalized = state.trim().toLowerCase().replace(/[\-_]+/g, " ");
 
   if (
-    /(done|closed|resolved|complete|completed|fixed|merged|shipped|released|deployed|accepted)/
+    /(done|closed|resolved|complete|completed|fixed|merged|shipped|released|deployed|accepted|cancelled|canceled)/
       .test(normalized)
   ) return "completed";
 
