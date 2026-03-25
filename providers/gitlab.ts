@@ -36,17 +36,17 @@ const getPaginatedResults = async <T>(
   return allResults;
 };
 
-const getUserID = async (
+const getUser = async (
   gitlabURL: string,
   headers: Record<string, string>,
-): Promise<number> => {
-  const data = await requestJsonWithRetry<{ id: number }>(
+): Promise<{ id: number; username: string }> => {
+  const data = await requestJsonWithRetry<{ id: number; username: string }>(
     `${gitlabURL}/api/v4/user`,
     { headers },
     "GitLab user",
   );
 
-  return data.id;
+  return { id: data.id, username: data.username };
 };
 
 const getProjects = async (
@@ -153,27 +153,29 @@ export const gitlabIssues = async (
   headers: Record<string, string>,
   startDate: string,
   endDate: string,
-) => {
-  const userID = await getUserID(gitlabURL, headers);
-  const projects = await getProjects(gitlabURL, headers, userID);
+): Promise<{ issues: GitlabIssue[]; username: string }> => {
+  const user = await getUser(gitlabURL, headers);
+  const projects = await getProjects(gitlabURL, headers, user.id);
 
   const issuesToProcess = await getIssues(
     projects,
     gitlabURL,
     headers,
-    userID,
+    user.id,
     startDate,
     endDate,
   );
 
   if (!issuesToProcess.size) {
-    return [];
+    return { issues: [], username: user.username };
   }
 
-  return await filterNotes(
+  const issues = await filterNotes(
     issuesToProcess,
     gitlabURL,
     headers,
-    userID,
+    user.id,
   );
+
+  return { issues, username: user.username };
 };

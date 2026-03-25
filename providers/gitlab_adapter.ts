@@ -9,6 +9,7 @@ type GitLabDeps = {
 
 export class GitLabAdapter implements ProviderAdapter {
   name: "gitlab" = "gitlab";
+  resolvedUsername?: string;
   #deps: GitLabDeps;
 
   constructor(deps?: Partial<GitLabDeps>) {
@@ -39,11 +40,13 @@ export class GitLabAdapter implements ProviderAdapter {
       "PRIVATE-TOKEN": config.gitlabPAT,
     };
 
-    return await this.#deps.fetchLive(
+    const { issues, username } = await this.#deps.fetchLive(
       config.gitlabURL,
       headers,
       dateWindow.startDate,
       dateWindow.endDate,
     );
+    this.resolvedUsername = username;
+    return issues;
   }
 }

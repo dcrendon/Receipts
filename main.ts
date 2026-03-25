@@ -15,6 +15,7 @@ import {
   EXIT_CODES,
   ProviderRunResult,
 } from "./core/run_status.ts";
+import { GitLabAdapter } from "./providers/gitlab_adapter.ts";
 import { getProviderAdapters } from "./providers/index.ts";
 import { providerLabel } from "./providers/provider_meta.ts";
 import { ProviderName } from "./providers/types.ts";
@@ -105,7 +106,9 @@ const runFetch = async (config: Config) => {
         generatedAt: new Date().toISOString(),
         geminiApiKey: config.geminiApiKey!,
         usernames: {
-          gitlab: config.gitlabUsername,
+          gitlab: adapters.find((a): a is GitLabAdapter =>
+            a instanceof GitLabAdapter
+          )?.resolvedUsername,
           jira: config.jiraUsername,
           github: config.githubUsername,
         },

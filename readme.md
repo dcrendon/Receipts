@@ -38,7 +38,6 @@ All configuration is via `.env`. When run interactively in a terminal, a setup w
 | `END_DATE` | When `TIME_RANGE=custom` | End date — `MM-DD-YYYY` |
 | `GITLAB_PAT` | GitLab | Personal access token |
 | `GITLAB_URL` | GitLab | Instance URL (e.g. `https://gitlab.com`) |
-| `GITLAB_USERNAME` | No | Username for issue/comment attribution |
 | `JIRA_PAT` | Jira | Personal access token |
 | `JIRA_URL` | Jira | Instance URL (e.g. `https://jira.example.com`) |
 | `JIRA_USERNAME` | Jira | Username for attribution |

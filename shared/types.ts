@@ -5,7 +5,6 @@ export type ProviderName = "gitlab" | "jira" | "github";
 export interface Config {
   gitlabPAT?: string;
   gitlabURL?: string;
-  gitlabUsername?: string;
   jiraPAT?: string;
   jiraURL?: string;
   jiraUsername?: string;
