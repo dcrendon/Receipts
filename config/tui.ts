@@ -1,4 +1,9 @@
-import { promptSecret } from "@std/cli";
+import { Confirm } from "@cliffy/prompt/confirm";
+import { Input } from "@cliffy/prompt/input";
+import { Secret } from "@cliffy/prompt/secret";
+import { Select } from "@cliffy/prompt/select";
+import { Table } from "@cliffy/table";
+import { bold, cyan, green, yellow } from "@std/fmt/colors";
 import { Config } from "../shared/types.ts";
 import {
   describeProviderField,
@@ -11,9 +16,6 @@ import { ProviderName } from "../providers/types.ts";
 const TIME_RANGES = ["week", "month", "year", "custom"] as const;
 const PROVIDERS = ["gitlab", "jira", "github", "all"] as const;
 const OUTPUT_DIR = "output";
-
-const isNonEmpty = (value: string | null): value is string =>
-  Boolean(value && value.trim().length > 0);
 
 export const getDefaultOutFile = (provider: Config["provider"]): string => {
   if (provider === "gitlab") return `${OUTPUT_DIR}/gitlab_issues.json`;
@@ -33,184 +35,159 @@ export const normalizeChoice = <T extends readonly string[]>(
   return found;
 };
 
-const askChoice = <T extends readonly string[]>(
-  question: string,
-  options: T,
-  defaultValue: T[number],
-): T[number] => {
-  while (true) {
-    const raw = prompt(
-      `${question} [${options.join("/")}] (default: ${defaultValue})`,
-    );
-    const value = normalizeChoice(raw ?? undefined, options) ??
-      normalizeChoice(defaultValue, options);
-    if (value) return value;
-    console.log(`Invalid value. Use one of: ${options.join(", ")}`);
-  }
-};
-
-const askBoolean = (question: string, defaultValue: boolean): boolean => {
-  while (true) {
-    const defaultHint = defaultValue ? "[Y/n]" : "[y/N]";
-    const raw = prompt(`${question} ${defaultHint}`);
-    const normalized = (raw ?? "").trim().toLowerCase();
-    if (!normalized) return defaultValue;
-    if (["y", "yes"].includes(normalized)) return true;
-    if (["n", "no"].includes(normalized)) return false;
-    console.log("Invalid value. Use y or n.");
-  }
-};
-
-const askRequiredText = (question: string, defaultValue?: string): string => {
-  while (true) {
-    const suffix = defaultValue ? ` (default: ${defaultValue})` : "";
-    const raw = prompt(`${question}${suffix}`);
-    const value = isNonEmpty(raw) ? raw.trim() : defaultValue?.trim();
-    if (value) return value;
-    console.log("This field is required.");
-  }
-};
-
-const askRequiredSecret = (question: string, defaultValue?: string): string => {
-  const useDefault = Boolean(defaultValue) &&
-    askBoolean(`${question}: keep existing value?`, true);
-  if (useDefault && defaultValue) {
-    return defaultValue;
-  }
-
-  while (true) {
-    const raw = promptSecret(question, { mask: "*" });
-    if (isNonEmpty(raw)) {
-      return raw.trim();
-    }
-    console.log("This field is required.");
-  }
-};
-
 const formatStep = (
   step: number,
   totalSteps: number,
   label: string,
-): string => `Step ${step}/${totalSteps} - ${label}`;
+): string => `${bold(cyan(`Step ${step}/${totalSteps}`))} — ${label}`;
 
 const formatMissingFields = (fields: (keyof Config)[]): string =>
   fields.map(describeProviderField).join(", ");
 
-export const formatProviderReadinessSummary = (config: Config): string[] => {
-  const readiness = getProviderReadiness(config);
-  const lines = ["Provider readiness:"];
-  const longestLabel = readiness.selectedProviders.reduce(
-    (max, provider) => Math.max(max, providerLabel(provider).length),
-    0,
+const printBanner = (): void => {
+  console.log("");
+  console.log(bold(cyan("  ┌─────────────────────────────────────────┐")));
+  console.log(
+    bold(cyan("  │")) +
+      bold("       RECEIPTS  —  Issue Reporter       ") +
+      bold(cyan("│")),
   );
-
-  for (const provider of readiness.selectedProviders) {
-    const label = providerLabel(provider).padEnd(longestLabel);
-    const missing = readiness.missingByProvider[provider] ?? [];
-    if (missing.length === 0) {
-      lines.push(`- ${label} | ready`);
-    } else {
-      lines.push(`- ${label} | skipping`);
-    }
-  }
-
-  return lines;
+  console.log(bold(cyan("  └─────────────────────────────────────────┘")));
+  console.log("");
 };
 
-const captureProviderCredentials = (
+const captureProviderCredentials = async (
   config: Config,
   provider: ProviderName,
-): void => {
+): Promise<void> => {
   const missing = getMissingFieldsForProvider(config, provider);
-  if (!missing.length) {
-    return;
-  }
-
-  console.log(`\n${providerLabel(provider)} is missing required credentials.`);
+  if (!missing.length) return;
 
   for (const field of missing) {
     if (field === "gitlabPAT") {
-      config.gitlabPAT = askRequiredSecret(
-        "Enter GitLab Personal Access Token",
-      );
+      const keep = config.gitlabPAT
+        ? await Confirm.prompt({ message: "GitLab PAT: keep existing value?", default: true })
+        : false;
+      if (!keep) {
+        config.gitlabPAT = await Secret.prompt({
+          message: "Enter GitLab Personal Access Token",
+          minLength: 1,
+        });
+      }
       continue;
     }
     if (field === "gitlabURL") {
-      config.gitlabURL = askRequiredText(
-        "Enter GitLab URL (e.g., https://gitlab.com)",
-        config.gitlabURL,
-      );
+      config.gitlabURL = await Input.prompt({
+        message: "Enter GitLab URL",
+        hint: "https://gitlab.com",
+        default: config.gitlabURL ?? "",
+        minLength: 1,
+      });
       continue;
     }
     if (field === "jiraPAT") {
-      config.jiraPAT = askRequiredSecret("Enter Jira Personal Access Token");
+      const keep = config.jiraPAT
+        ? await Confirm.prompt({ message: "Jira PAT: keep existing value?", default: true })
+        : false;
+      if (!keep) {
+        config.jiraPAT = await Secret.prompt({
+          message: "Enter Jira Personal Access Token",
+          minLength: 1,
+        });
+      }
       continue;
     }
     if (field === "jiraURL") {
-      config.jiraURL = askRequiredText(
-        "Enter Jira URL (e.g., https://jira.example.com/)",
-        config.jiraURL,
-      );
+      config.jiraURL = await Input.prompt({
+        message: "Enter Jira URL",
+        hint: "https://jira.example.com/",
+        default: config.jiraURL ?? "",
+        minLength: 1,
+      });
       continue;
     }
     if (field === "jiraUsername") {
-      config.jiraUsername = askRequiredText(
-        "Enter Jira username",
-        config.jiraUsername,
-      );
+      config.jiraUsername = await Input.prompt({
+        message: "Enter Jira username",
+        default: config.jiraUsername ?? "",
+        minLength: 1,
+      });
       continue;
     }
     if (field === "githubPAT") {
-      config.githubPAT = askRequiredSecret(
-        "Enter GitHub Personal Access Token",
-      );
+      const keep = config.githubPAT
+        ? await Confirm.prompt({ message: "GitHub PAT: keep existing value?", default: true })
+        : false;
+      if (!keep) {
+        config.githubPAT = await Secret.prompt({
+          message: "Enter GitHub Personal Access Token",
+          minLength: 1,
+        });
+      }
       continue;
     }
     if (field === "githubURL") {
-      config.githubURL = askRequiredText(
-        "Enter GitHub API URL (e.g., https://api.github.com)",
-        config.githubURL,
-      );
+      config.githubURL = await Input.prompt({
+        message: "Enter GitHub API URL",
+        hint: "https://api.github.com",
+        default: config.githubURL ?? "",
+        minLength: 1,
+      });
       continue;
     }
     if (field === "githubUsername") {
-      config.githubUsername = askRequiredText(
-        "Enter GitHub username",
-        config.githubUsername,
-      );
+      config.githubUsername = await Input.prompt({
+        message: "Enter GitHub username",
+        default: config.githubUsername ?? "",
+        minLength: 1,
+      });
     }
   }
 };
 
-export const runSetup = (
-  seed: Config,
-): Config => {
+export const runSetup = async (seed: Config): Promise<Config> => {
+  printBanner();
+
   const totalSteps = 3;
   let step = 1;
 
-  const provider = askChoice(
-    formatStep(step++, totalSteps, "Select provider"),
-    PROVIDERS,
-    normalizeChoice(seed.provider, PROVIDERS) ?? "all",
-  );
+  const provider = await Select.prompt({
+    message: formatStep(step++, totalSteps, "Select provider"),
+    options: [
+      { name: "All providers", value: "all" },
+      { name: "GitLab", value: "gitlab" },
+      { name: "GitHub", value: "github" },
+      { name: "Jira", value: "jira" },
+    ],
+    default: normalizeChoice(seed.provider, PROVIDERS) ?? "all",
+  }) as Config["provider"];
 
-  const timeRange = askChoice(
-    formatStep(step++, totalSteps, "Select time range"),
-    TIME_RANGES,
-    normalizeChoice(seed.timeRange, TIME_RANGES) ?? "week",
-  );
+  const timeRange = await Select.prompt({
+    message: formatStep(step++, totalSteps, "Select time range"),
+    options: [
+      { name: "Last 7 days", value: "week" },
+      { name: "Last 30 days", value: "month" },
+      { name: "Last year", value: "year" },
+      { name: "Custom range", value: "custom" },
+    ],
+    default: normalizeChoice(seed.timeRange, TIME_RANGES) ?? "week",
+  }) as Config["timeRange"];
 
   let startDate = seed.startDate;
   let endDate = seed.endDate;
   if (timeRange === "custom") {
-    startDate = askRequiredText(
-      "Enter custom START_DATE (MM-DD-YYYY)",
-      seed.startDate,
-    );
-    endDate = askRequiredText(
-      "Enter custom END_DATE (MM-DD-YYYY)",
-      seed.endDate,
-    );
+    startDate = await Input.prompt({
+      message: "Enter custom START_DATE",
+      hint: "MM-DD-YYYY",
+      default: seed.startDate ?? "",
+      minLength: 1,
+    });
+    endDate = await Input.prompt({
+      message: "Enter custom END_DATE",
+      hint: "MM-DD-YYYY",
+      default: seed.endDate ?? "",
+      minLength: 1,
+    });
   }
 
   const config: Config = {
@@ -228,34 +205,53 @@ export const runSetup = (
   );
 
   if (needsCredentials) {
-    console.log(formatStep(step, totalSteps, "Review provider credentials"));
+    console.log("\n" + formatStep(step, totalSteps, "Review provider credentials"));
 
     for (const target of selectedProviders) {
       const missing = getMissingFieldsForProvider(config, target);
       if (!missing.length) continue;
 
-      const shouldCapture = askBoolean(
-        `${providerLabel(target)} is missing ${
-          formatMissingFields(missing)
-        }. Add now?`,
-        true,
-      );
+      const shouldCapture = await Confirm.prompt({
+        message: `${cyan(providerLabel(target))} is missing ${formatMissingFields(missing)}. Add now?`,
+        default: true,
+      });
       if (shouldCapture) {
-        captureProviderCredentials(config, target);
+        await captureProviderCredentials(config, target);
       }
     }
   } else {
     console.log(
-      formatStep(step, totalSteps, "Provider credentials — all set"),
+      "\n" + formatStep(step, totalSteps, "Provider credentials — all set"),
     );
   }
 
+  // Provider readiness table
+  const readiness = getProviderReadiness(config);
   console.log("");
-  for (const line of formatProviderReadinessSummary(config)) {
-    console.log(line);
-  }
+  console.log(bold("  Provider Readiness"));
+  new Table()
+    .header([bold("Provider"), bold("Status"), bold("Notes")])
+    .body(
+      readiness.selectedProviders.map((p) => {
+        const missing = readiness.missingByProvider[p] ?? [];
+        const ready = missing.length === 0;
+        return [
+          cyan(providerLabel(p)),
+          ready ? green("ready") : yellow("skipping"),
+          ready ? "" : `missing: ${missing.map(describeProviderField).join(", ")}`,
+        ];
+      }),
+    )
+    .border(true)
+    .padding(1)
+    .indent(2)
+    .render();
+  console.log("");
 
-  const confirmed = askBoolean("Start run with this configuration?", true);
+  const confirmed = await Confirm.prompt({
+    message: bold("Start run with this configuration?"),
+    default: true,
+  });
   if (!confirmed) {
     console.log("Run canceled.");
     Deno.exit(0);

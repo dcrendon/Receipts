@@ -82,13 +82,14 @@ Deno.test("gitlabIssues returns contributor issues for all_contributions mode", 
       return Promise.resolve(makeJsonResponse({}, 404));
     }) as typeof fetch;
 
-    const issues = await gitlabIssues(
+    const { issues, username } = await gitlabIssues(
       "https://gitlab.example.com",
       { "PRIVATE-TOKEN": "token" },
       "2026-02-01T00:00:00.000Z",
       "2026-02-16T23:59:59.999Z",
     );
 
+    assertEquals(username, "me");
     assertEquals(issues.length, 1);
     assertEquals(issues[0].id, 5001);
     assertEquals(Array.isArray(issues[0].notes), true);

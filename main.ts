@@ -10,6 +10,9 @@ import {
   providerLabel as readinessProviderLabel,
 } from "./config/provider_readiness.ts";
 import { runSetup } from "./config/tui.ts";
+import { Spinner } from "@std/cli/unstable-spinner";
+import { bold, cyan, green, red, yellow } from "@std/fmt/colors";
+import { Table } from "@cliffy/table";
 import {
   evaluateRunStatus,
   EXIT_CODES,
@@ -60,16 +63,23 @@ const runFetch = async (config: Config) => {
   const adapters = getProviderAdapters();
   const requestedProviders = readiness.runnableProviders;
 
+  console.log("");
   for (const adapter of adapters) {
     if (!adapter.canRun(config)) {
       continue;
     }
 
+    const label = providerLabel(adapter.name);
+    const spinner = new Spinner({
+      message: `Fetching ${cyan(label)} issues...`,
+      color: "cyan",
+    });
+    spinner.start();
+
     try {
-      console.log(`\n[${providerLabel(adapter.name)}] Fetching issues...`);
       const issues = await adapter.fetchIssues(config, { startDate, endDate });
-      const providerTitle = providerLabel(adapter.name);
-      console.log(`[${providerTitle}] Completed: ${issues.length} issues.`);
+      spinner.stop();
+      console.log(`  ${green("✓")} ${bold(label)}: ${issues.length} issues`);
 
       runResults.push({
         provider: adapter.name,
@@ -81,8 +91,8 @@ const runFetch = async (config: Config) => {
       const errorMessage = error instanceof Error
         ? error.message
         : String(error);
-      const providerTitle = providerLabel(adapter.name);
-      console.error(`\n${providerTitle} provider failed: ${errorMessage}`);
+      spinner.stop();
+      console.error(`  ${red("✗")} ${bold(label)}: ${errorMessage}`);
       runResults.push({
         provider: adapter.name,
         status: "failed",
@@ -120,28 +130,35 @@ const runFetch = async (config: Config) => {
         },
       });
       const { htmlPath, normalizedPath } = await writeRunReport(report);
-      console.log(`\nSummary HTML report written to ${htmlPath}`);
-      console.log(`Normalized issues written to ${normalizedPath}`);
+      console.log(`\n  ${green("✓")} Report:     ${cyan(htmlPath)}`);
+      console.log(`  ${green("✓")} Normalized: ${cyan(normalizedPath)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`\nReport generation failed: ${message}`);
     }
   }
 
-  console.log("\nRun Summary:");
-  for (const result of runResults) {
-    const providerTitle = readinessProviderLabel(result.provider);
-    const suffix = result.status === "success"
-      ? `${result.issueCount} issues`
-      : result.error ?? "unknown error";
-    console.log(`- ${providerTitle}: ${result.status} (${suffix})`);
-  }
-
-  for (const provider of skippedProviders) {
-    console.log(
-      `- ${readinessProviderLabel(provider)}: skipped`,
-    );
-  }
+  console.log(`\n${bold("  Run Summary")}`);
+  new Table()
+    .header([bold("Provider"), bold("Status"), bold("Details")])
+    .body([
+      ...runResults.map((result) => [
+        cyan(readinessProviderLabel(result.provider)),
+        result.status === "success" ? green("success") : red("failed"),
+        result.status === "success"
+          ? `${result.issueCount} issues`
+          : (result.error ?? "unknown error"),
+      ]),
+      ...skippedProviders.map((provider) => [
+        cyan(readinessProviderLabel(provider)),
+        yellow("skipped"),
+        "—",
+      ]),
+    ])
+    .border(true)
+    .padding(1)
+    .indent(2)
+    .render();
 
   promptExit(
     `Process completed with status: ${runStatus}.`,
@@ -163,7 +180,7 @@ const main = async () => {
   });
 
   const config = Deno.stdin.isTerminal()
-    ? runSetup(baseConfig)
+    ? await runSetup(baseConfig)
     : baseConfig;
 
   if (!config.geminiApiKey) {

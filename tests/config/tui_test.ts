@@ -1,9 +1,9 @@
 import { assertEquals } from "@std/assert";
 import {
-  formatProviderReadinessSummary,
   getDefaultOutFile,
   normalizeChoice,
 } from "../../config/tui.ts";
+import { getProviderReadiness } from "../../config/provider_readiness.ts";
 import { Config } from "../../shared/types.ts";
 
 const baseConfig = (overrides: Partial<Config> = {}): Config => ({
@@ -28,33 +28,22 @@ Deno.test("normalizeChoice validates and normalizes input", () => {
   assertEquals(normalizeChoice("invalid", allowed), undefined);
 });
 
-Deno.test("formatProviderReadinessSummary marks missing providers as skipping", () => {
-  const lines = formatProviderReadinessSummary(
-    baseConfig({
-      provider: "all",
-      gitlabPAT: "token",
-      gitlabURL: "https://gitlab.com",
-      jiraPAT: "token",
-      githubPAT: "token",
-      githubURL: "https://api.github.com",
-      githubUsername: "user",
-    }),
-  );
+Deno.test("getProviderReadiness marks providers with missing credentials as not runnable", () => {
+  const config = baseConfig({
+    provider: "all",
+    gitlabPAT: "token",
+    gitlabURL: "https://gitlab.com",
+    jiraPAT: "token",
+    githubPAT: "token",
+    githubURL: "https://api.github.com",
+    githubUsername: "user",
+  });
 
-  assertEquals(lines[0], "Provider readiness:");
-  assertEquals(
-    lines.some((line) => line.includes("GitLab") && line.includes("| ready")),
-    true,
-  );
-  assertEquals(
-    lines.some((line) =>
-      line.includes("Jira") &&
-      line.includes("| skipping")
-    ),
-    true,
-  );
-  assertEquals(
-    lines.some((line) => line.includes("GitHub") && line.includes("| ready")),
-    true,
-  );
+  const readiness = getProviderReadiness(config);
+
+  assertEquals(readiness.runnableProviders.includes("gitlab"), true);
+  assertEquals(readiness.runnableProviders.includes("github"), true);
+  // Jira is missing jiraURL and jiraUsername so it should not be runnable
+  assertEquals(readiness.runnableProviders.includes("jira"), false);
+  assertEquals((readiness.missingByProvider["jira"]?.length ?? 0) > 0, true);
 });

@@ -71,7 +71,7 @@ Deno.test("GitLabAdapter uses live fetch", async () => {
   const adapter = new GitLabAdapter({
     fetchLive: () => {
       usedLive = true;
-      return Promise.resolve([]);
+      return Promise.resolve({ issues: [], username: "" });
     },
   });
 
